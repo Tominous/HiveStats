@@ -70,4 +70,38 @@ async def get_stats(ctx, uuid=None, game='BP'):
     await ctx.send(embed=embed)
 
 
+@client.command(name='names')
+async def get_names(ctx, uuid=None, count: int = None):
+    if count and count <= 0:
+        await ctx.send('Please input a number larger than 0.')
+
+    valid, resolved = resolve_username(uuid)
+
+    if not valid:
+        await ctx.send(resolved)
+
+    uuid = resolved
+    response = get_username_history(uuid)
+    count = len(response) if count is None else count
+
+    names = [entry.name for entry in response[::-1]]
+    # Java timestamps are returned which are in millisecs, so we divide by 1000
+    times = [datetime.fromtimestamp(entry.changedToAt / 1000).strftime('%d %b, %Y %H:%M')
+             for entry in response[:0:-1]]
+    times.append('(Original Name)')
+
+    embed = discord.Embed(
+        title='**{}\'s Name History**'.format(names[0]),
+        color=0xffa500
+    )
+
+    embed.set_thumbnail(url=player_head(uuid))
+    embed.add_field(name='**Names**',
+                    value='\n'.join(['**{}** - {}'.format(name, time)
+                                     for name, time in zip(names[:count],
+                                                           times[:count])]))
+
+    await ctx.send(embed=embed)
+
+
 client.run(TOKEN)
