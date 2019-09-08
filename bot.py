@@ -1,8 +1,9 @@
 import os
 import discord
+from datetime import datetime
 
 from discord.ext.commands import Bot
-from mojang_api import get_uuid, is_valid_uuid
+from mojang_api import get_uuid, is_valid_uuid, get_username_history
 
 import hive_interface as hive
 from content_functions import BlockPartyStats
@@ -21,27 +22,45 @@ async def on_ready():
     await client.change_presence(activity=discord.Game(name='The Hive'))
 
 
-@client.command(name="stats")
-async def get_stats(ctx, uuid=None, game='BP'):
-    if not uuid:
-        await ctx.send("Please provide a username.")
+def resolve_username(username):
+    """Resolves a username to a uuid if valid
 
-    if not is_valid_uuid(uuid):
+    Args:
+        username (str or None): [description]
+
+    Returns:
+        bool: whether the username was valid
+        str: the resolved uuid or error message
+    """
+    if not username:
+        return False, 'Please provide a username.'
+
+    if not is_valid_uuid(username):
         try:
-            uuid = get_uuid(uuid).id
+            uuid = get_uuid(username).id
         except AttributeError:
-            await ctx.sen("Username or UUID was not found.")
+            return False, 'Username or UUID was not found.'
 
+    return True, uuid
+
+
+@client.command(name='stats')
+async def get_stats(ctx, uuid=None, game='BP'):
+    valid, resolved = resolve_username(uuid)
+
+    if not valid:
+        await ctx.send(resolved)
+
+    uuid = resolved
     info = hive.player_data(uuid)
     stats = hive.player_data(uuid, game)
-    online = info['lastLogout'] < info['lastLogin']
 
     embed = discord.Embed(
         title='**{}** - {}'.format(info['username'],
                                    info['modernRank']['human']),
         description='{} {}'.format(info['status']['description'],
                                    info['status']['game']),
-        color=0x00ff00 if online else 0x222222)
+        color=0x00ff00 if info['lastLogout'] < info['lastLogin'] else 0x222222)
 
     embed.set_thumbnail(url=player_head(uuid))
 
