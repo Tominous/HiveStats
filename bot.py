@@ -37,11 +37,11 @@ def resolve_username(username):
 
     if not is_valid_uuid(username):
         try:
-            uuid = get_uuid(username).id
+            username = get_uuid(username).id
         except AttributeError:
             return False, 'Username or UUID was not found.'
 
-    return True, uuid
+    return True, username.replace('-', '')
 
 
 @client.command(name='stats')
@@ -90,16 +90,24 @@ async def get_names(ctx, uuid=None, count: int = None):
              for entry in response[:0:-1]]
     times.append('(Original Name)')
 
+    # Trim down lists to requested size
+    names, times = names[:count], times[:count]
+
     embed = discord.Embed(
         title='**{}\'s Name History**'.format(names[0]),
         color=0xffa500
     )
 
     embed.set_thumbnail(url=player_head(uuid))
-    embed.add_field(name='**Names**',
-                    value='\n'.join(['**{}** - {}'.format(name, time)
-                                     for name, time in zip(names[:count],
-                                                           times[:count])]))
+
+    batch_size = 20
+
+    for i in range(0, len(names), batch_size):
+        embed.add_field(name='\u200b',
+                        value='\n'.join(['**{}** - {}'.format(name, time)
+                                         for name, time in zip(names[i:i + batch_size],
+                                                               times[i:i + batch_size])]),
+                        inline=False)
 
     await ctx.send(embed=embed)
 
