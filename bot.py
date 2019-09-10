@@ -1,12 +1,14 @@
 import os
 import discord
-from datetime import datetime
+from datetime import datetime, time
 
 from discord.ext.commands import Bot
 from mojang_api import get_uuid, is_valid_uuid, get_username_history
 
 import hive_interface as hive
 from content_functions import BlockPartyStats
+
+
 
 
 BOT_PREFIX = '/'
@@ -42,9 +44,33 @@ def resolve_username(username):
             return False, 'Username or UUID was not found.'
 
     return True, username.replace('-', '')
+def display_time(seconds, granularity=2):
+    intervals = (
+    ('weeks', 604800),('days', 86400),('hours', 3600),
+    ('minutes', 60),('seconds', 1))
+    result = []
 
+    for name, count in intervals:
+        value = seconds // count
+        if value:
+            seconds -= value * count
+            if value == 1:
+                name = name.rstrip('s')
+            result.append("{} {}".format(value, name))
+    return ', '.join(result[:granularity])
 
-@client.command(name='stats')
+## TO-DO: embed, add to stats
+@client.command(name='seen')
+async def date(ctx, username):
+    info = hive.player_data(username)
+    currentTime = int(datetime.timestamp(datetime.now()))
+    logoutTime = info['lastLogout']
+    timeDifference = currentTime - logoutTime
+    await ctx.send(username + ' was last seen ' +
+                   display_time(timeDifference) + ' ago.')
+    
+
+@client.command(name='stats',aliases=['records','stat'])
 async def get_stats(ctx, uuid=None, game='BP'):
     valid, resolved = resolve_username(uuid)
 
@@ -70,7 +96,7 @@ async def get_stats(ctx, uuid=None, game='BP'):
     await ctx.send(embed=embed)
 
 
-@client.command(name='names')
+@client.command(name='names', aliases=['history','namemc'])
 async def get_names(ctx, uuid=None, count: int = None):
     if count and count <= 0:
         await ctx.send('Please input a number larger than 0.')
