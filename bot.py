@@ -1,6 +1,6 @@
 import os
 import discord
-from datetime import datetime, time
+from datetime import datetime
 
 from discord.ext.commands import Bot
 from mojang_api import get_uuid, is_valid_uuid, get_username_history
@@ -44,31 +44,63 @@ def resolve_username(username):
             return False, 'Username or UUID was not found.'
 
     return True, username.replace('-', '')
-def display_time(seconds, granularity=2):
-    intervals = (
-    ('weeks', 604800),('days', 86400),('hours', 3600),
-    ('minutes', 60),('seconds', 1))
+
+
+def format_interval(seconds, granularity=2):
+    intervals = (('years', 31536000), ('weeks', 604800), ('days', 86400),
+                 ('hours', 3600), ('minutes', 60), ('seconds', 1))
     result = []
 
-    for name, count in intervals:
-        value = seconds // count
+    for name, length in intervals:
+        value = seconds // length
+
         if value:
-            seconds -= value * count
+            seconds &= length
+
             if value == 1:
-                name = name.rstrip('s')
+                name = name[:-1]  # Remove 's' from the end
+
             result.append("{} {}".format(value, name))
+
     return ', '.join(result[:granularity])
 
-## TO-DO: embed, add to stats
+
+def embed_header(uuid, info):
+    if info['lastLogout'] < info['lastLogin']:
+        description = '{} {}'.format(info['status']['description'],
+                                     info['status']['game'])
+        color = 0x00ff00
+    else:
+        current_time = int(datetime.timestamp(datetime.now()))
+        time_diff = current_time - info['lastLogout']
+        description = '{} was last seen {} ago'.format(
+            info['username'], format_interval(time_diff))
+        color = 0x222222
+
+    embed = discord.Embed(
+        title='**{}** - {}'.format(info['username'],
+                                   info['modernRank']['human']),
+        description=description,
+        color=color)
+
+    embed.set_thumbnail(url=player_head(uuid))
+
+    return embed
+
+
 @client.command(name='seen')
-async def date(ctx, username):
-    info = hive.player_data(username)
-    currentTime = int(datetime.timestamp(datetime.now()))
-    logoutTime = info['lastLogout']
-    timeDifference = currentTime - logoutTime
-    await ctx.send(username + ' was last seen ' +
-                   display_time(timeDifference) + ' ago.')
-    
+async def seen(ctx, username):
+    valid, resolved = resolve_username(username)
+
+    if not valid:
+        await ctx.send(resolved)
+
+    uuid = resolved
+    info = hive.player_data(uuid)
+
+    embed = embed_header(uuid, info)
+    await ctx.send(embed=embed)
+
 
 @client.command(name='stats',aliases=['records','stat'])
 async def get_stats(ctx, uuid=None, game='BP'):
