@@ -6,15 +6,13 @@ from discord.ext.commands import Bot
 from mojang_api import get_uuid, is_valid_uuid, get_username_history
 
 import hive_interface as hive
-from content_functions import BlockPartyStats
-
-
+from content_functions import get_next_rank
 
 
 BOT_PREFIX = '/'
 TOKEN = os.environ['discordToken']
 
-player_head = 'https://visage.surgeplay.com/head/96/{}'.format
+
 client = Bot(command_prefix=BOT_PREFIX, case_insensitive=True)
 
 
@@ -24,11 +22,28 @@ async def on_ready():
     await client.change_presence(activity=discord.Game(name='The Hive'))
 
 
+def player_head(uuid, size):
+    """Returns link to thumbnail of player head
+
+    Args:
+        uuid (str): id fo player to retrieve data for
+        size (int): widht and height in pixels of image
+
+    Note:
+        api only supports sizes that are multiples of 16, rounding
+        will be done automatically
+
+    Returns:
+        str: url for the thumbnail image
+    """
+    return'https://visage.surgeplay.com/head/{}/{}'.format(size, uuid)
+
+
 def resolve_username(username):
     """Resolves a username to a uuid if valid
 
     Args:
-        username (str or None): [description]
+        username (str or None): username to be resolved
 
     Returns:
         bool: whether the username was valid
@@ -55,7 +70,7 @@ def format_interval(seconds, granularity=2):
         value = seconds // length
 
         if value:
-            seconds &= length
+            seconds %= length
 
             if value == 1:
                 name = name[:-1]  # Remove 's' from the end
@@ -65,7 +80,19 @@ def format_interval(seconds, granularity=2):
     return ', '.join(result[:granularity])
 
 
-def embed_header(uuid, info):
+def embed_header(uuid, head_size=96):
+    """Creates an embed with the primary fields filled in as required
+
+    Args:
+        uuid (str): id of player to retrieve data for
+        head_size (int, optional): width and heightin pixels of thumbnail image
+                                   defaults to 96
+
+    Returns:
+        discord.Embed: an embed object formatted as required
+    """
+    info = hive.player_data(uuid)
+
     if info['lastLogout'] < info['lastLogin']:
         description = '{} {}'.format(info['status']['description'],
                                      info['status']['game'])
@@ -83,7 +110,7 @@ def embed_header(uuid, info):
         description=description,
         color=color)
 
-    embed.set_thumbnail(url=player_head(uuid))
+    embed.set_thumbnail(url=player_head(uuid, head_size))
 
     return embed
 
@@ -96,13 +123,12 @@ async def seen(ctx, username):
         await ctx.send(resolved)
 
     uuid = resolved
-    info = hive.player_data(uuid)
 
-    embed = embed_header(uuid, info)
+    embed = embed_header(uuid, 64)
     await ctx.send(embed=embed)
 
 
-@client.command(name='stats',aliases=['records','stat'])
+@client.command(name='stats', aliases=['records', 'stat'])
 async def get_stats(ctx, uuid=None, game='BP'):
     valid, resolved = resolve_username(uuid)
 
@@ -110,25 +136,29 @@ async def get_stats(ctx, uuid=None, game='BP'):
         await ctx.send(resolved)
 
     uuid = resolved
-    info = hive.player_data(uuid)
     stats = hive.player_data(uuid, game)
 
-    embed = discord.Embed(
-        title='**{}** - {}'.format(info['username'],
-                                   info['modernRank']['human']),
-        description='{} {}'.format(info['status']['description'],
-                                   info['status']['game']),
-        color=0x00ff00 if info['lastLogout'] < info['lastLogin'] else 0x222222)
+    embed = embed_header(uuid)
 
-    embed.set_thumbnail(url=player_head(uuid))
+    next_rank, diff = get_next_rank(stats['total_points'])
+    content = f'''
+**Rank:** {stats['title']} ({diff} points to {next_rank})
+**Points:** {stats['total_points']}
+**Games Played:** {stats['games_played']}
+**Wins:** {stats['victories']}
+**Placings:** {stats['total_placing']}
+**Eliminations:** {stats['total_eliminations']}
+
+**W/L Ratio:** {stats['victories'] / (stats['games_played'] - stats['victories']):.2f}
+**Win Rate:** {stats['victories'] / stats['games_played']:.2%}'''
 
     if game == 'BP':
-        embed.add_field(name='BlockParty Stats', value=BlockPartyStats(stats))
+        embed.add_field(name='BlockParty Stats', value=content)
 
     await ctx.send(embed=embed)
 
 
-@client.command(name='names', aliases=['history','namemc'])
+@client.command(name='names', aliases=['history', 'namemc'])
 async def get_names(ctx, uuid=None, count: int = None):
     if count and count <= 0:
         await ctx.send('Please input a number larger than 0.')
@@ -156,7 +186,7 @@ async def get_names(ctx, uuid=None, count: int = None):
         color=0xffa500
     )
 
-    embed.set_thumbnail(url=player_head(uuid))
+    embed.set_thumbnail(url=player_head(uuid, 96))
 
     batch_size = 20
 

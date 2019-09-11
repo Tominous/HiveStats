@@ -27,7 +27,7 @@ RANK_DICT = {
 TOP_RANK = 'Billy Elliot'
 
 
-def NextRank(points):
+def get_next_rank(points):
     """Gets the next rank up from the points provided
 
     Args:
@@ -44,29 +44,3 @@ def NextRank(points):
     next_rank = reduce(lambda x, y: y if points > RANK_DICT[x] else x,
                        RANK_DICT.keys())
     return next_rank, RANK_DICT[next_rank] - points
-
-
-def BlockPartyStats(stats):
-    """Formats an embed field using the provided stats
-
-    Args:
-        stats (dict): valid dictionary of player stats
-
-    Returns:
-        str: value to use within embed field
-    """
-    next_rank, diff = NextRank(stats['total_points'])
-
-    content = f'''
-    **Rank:** {stats['title']} ({diff} points to {next_rank})
-    **Points:** {stats['total_points']}
-    **Games Played:** {stats['games_played']}
-    **Wins:** {stats['victories']}
-    **Placings:** {stats['total_placing']}
-    **Eliminations:** {stats['total_eliminations']}
-
-    **W/L Ratio:** {stats['victories'] / (stats['games_played'] - stats['victories']):.2f}
-    **Win Rate:** {stats['victories'] / stats['games_played']:.2%}
-    '''
-
-    return content
