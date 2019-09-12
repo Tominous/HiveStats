@@ -142,8 +142,16 @@ async def get_stats(ctx, uuid=None, game='BP'):
 
     embed = embed_header(uuid)
 
-    next_rank, diff = get_next_rank(stats['total_points'])
-    content = f'''
+    if stats.get('games_played') is None:
+        embed.add_field(name='BlockParty Stats',
+                        value='This player has never played BlockParty.')
+    else:
+        win_loss = ('Infinity' if stats['games_played'] == stats['victories'] else
+                    '{:.2f}'.format(stats['victories'] / (stats['games_played'] - stats['victories'])))
+        win_rate = '{:.2%}'.format(stats['victories'] / stats['games_played'])
+
+        next_rank, diff = get_next_rank(stats['total_points'])
+        content = f'''
 **Rank:** {stats['title']} ({diff} points to {next_rank})
 **Points:** {stats['total_points']}
 **Games Played:** {stats['games_played']}
@@ -151,11 +159,11 @@ async def get_stats(ctx, uuid=None, game='BP'):
 **Placings:** {stats['total_placing']}
 **Eliminations:** {stats['total_eliminations']}
 
-**W/L Ratio:** {stats['victories'] / (stats['games_played'] - stats['victories']):.2f}
-**Win Rate:** {stats['victories'] / stats['games_played']:.2%}'''
+**W/L Ratio:** {win_loss}
+**Win Rate:** {win_rate}'''
 
-    if game == 'BP':
-        embed.add_field(name='BlockParty Stats', value=content)
+        if game == 'BP':
+            embed.add_field(name='BlockParty Stats', value=content)
 
     await ctx.send(embed=embed)
 
