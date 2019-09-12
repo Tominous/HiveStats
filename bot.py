@@ -77,7 +77,7 @@ def format_interval(seconds, granularity=2):
 
             result.append("{} {}".format(value, name))
 
-    return ', '.join(result[:granularity])
+    return result[:granularity]
 
 
 def embed_header(uuid, head_size=96):
@@ -92,16 +92,18 @@ def embed_header(uuid, head_size=96):
         discord.Embed: an embed object formatted as required
     """
     info = hive.player_data(uuid)
+    current_time = int(datetime.timestamp(datetime.now()))
 
     if info['lastLogout'] < info['lastLogin']:
-        description = '{} {}'.format(info['status']['description'],
-                                     info['status']['game'])
+        time_diff = current_time - info['lastLogin']
+        description = '{} {}\nOnline for {}'.format(info['status']['description'],
+                                                    info['status']['game'],
+                                                    format_interval(time_diff, 1)[0])
         color = 0x00ff00
     else:
-        current_time = int(datetime.timestamp(datetime.now()))
         time_diff = current_time - info['lastLogout']
-        description = '{} was last seen {} ago'.format(
-            info['username'], format_interval(time_diff))
+        description = 'Last seen {} ago'.format(
+            ', '.join(format_interval(time_diff)))
         color = 0x222222
 
     embed = discord.Embed(
