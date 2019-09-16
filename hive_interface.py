@@ -13,11 +13,11 @@ def player_data(uuid, game=''):
             game else returns general Hive info on player
 
     Returns:
-        dict: serialized data for player
+        dict or bool: serialized data for player or False if request failed
     """
     r = requests.get(base('player/{}/{}'.format(uuid, game)))
 
-    return r.json()
+    return r.json() if r.ok else False
 
 
 def leaderboard(game, start, length=1):

@@ -80,39 +80,39 @@ def format_interval(seconds, granularity=2):
     return result[:granularity]
 
 
-def embed_header(uuid, head_size=96):
+def embed_header(data, head_size=96):
     """Creates an embed with the primary fields filled in as required
 
     Args:
-        uuid (str): id of player to retrieve data for
+        data (dict): json data for player returned from hive api
         head_size (int, optional): width and heightin pixels of thumbnail image
                                    defaults to 96
 
     Returns:
         discord.Embed: an embed object formatted as required
     """
-    info = hive.player_data(uuid)
     current_time = int(datetime.timestamp(datetime.now()))
 
-    if info['lastLogout'] < info['lastLogin']:
-        time_diff = current_time - info['lastLogin']
-        description = '{} {}\nOnline for {}'.format(info['status']['description'],
-                                                    info['status']['game'],
+    if data['lastLogout'] < data['lastLogin']:
+        time_diff = current_time - data['lastLogin']
+        description = '{} {}\nOnline for {}'.format(data['status']['description'],
+                                                    data['status']['game'],
                                                     format_interval(time_diff, 1)[0])
         color = 0x00ff00
     else:
-        time_diff = current_time - info['lastLogout']
+        time_diff = current_time - data['lastLogout']
         description = 'Last seen {} ago'.format(
             ', '.join(format_interval(time_diff)))
         color = 0x222222
 
     embed = discord.Embed(
-        title='**{}** - {}'.format(info['username'],
-                                   info['modernRank']['human']),
+        title='**{}** - {}'.format(
+            get_username_history(data['UUID'])[-1].name.replace('_', '\\_'),
+            data['modernRank']['human']),
         description=description,
         color=color)
 
-    embed.set_thumbnail(url=player_head(uuid, head_size))
+    embed.set_thumbnail(url=player_head(data['UUID'], head_size))
 
     return embed
 
@@ -123,10 +123,16 @@ async def seen(ctx, username):
 
     if not valid:
         await ctx.send(resolved)
+        return
 
     uuid = resolved
+    data = hive.player_data(uuid)
 
-    embed = embed_header(uuid, 64)
+    if not data:
+        await ctx.send('This player has never played on The Hive.')
+        return
+
+    embed = embed_header(data, 64)
     await ctx.send(embed=embed)
 
 
@@ -136,13 +142,19 @@ async def get_stats(ctx, uuid=None, game='BP'):
 
     if not valid:
         await ctx.send(resolved)
+        return
 
     uuid = resolved
+    data = hive.player_data(uuid)
+
+    if not data:
+        await ctx.send('This player has never played on The Hive.')
+        return
+
+    embed = embed_header(data)
     stats = hive.player_data(uuid, game)
 
-    embed = embed_header(uuid)
-
-    if stats.get('games_played') is None:
+    if not stats:
         embed.add_field(name='BlockParty Stats',
                         value='This player has never played BlockParty.')
     else:
@@ -172,17 +184,19 @@ async def get_stats(ctx, uuid=None, game='BP'):
 async def get_names(ctx, uuid=None, count: int = None):
     if count and count <= 0:
         await ctx.send('Please input a number larger than 0.')
+        return
 
     valid, resolved = resolve_username(uuid)
 
     if not valid:
         await ctx.send(resolved)
+        return
 
     uuid = resolved
     response = get_username_history(uuid)
     count = len(response) if count is None else count
 
-    names = [entry.name for entry in response[::-1]]
+    names = [entry.name.replace('_', '\\_') for entry in response[::-1]]
     # Java timestamps are returned which are in millisecs, so we divide by 1000
     times = [datetime.fromtimestamp(entry.changedToAt / 1000).strftime('%d %b, %Y %H:%M')
              for entry in response[:0:-1]]
