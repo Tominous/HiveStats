@@ -61,6 +61,23 @@ def resolve_username(username):
     return True, username.replace('-', '')
 
 
+def uuid_to_username(uuid):
+    """Resolves a uuid to current username if valid
+
+    Args:
+        uuid (str): uuid to be resolved
+
+    Returns:
+        str or None: current username or None if uuid is invalid
+    """
+    uuid = uuid.replace('-', '')
+
+    if is_valid_uuid(uuid):
+        return get_username_history(uuid)[-1].name.replace('_', '\\_')
+
+    return None
+
+
 def format_interval(seconds, granularity=2):
     intervals = (('years', 31536000), ('weeks', 604800), ('days', 86400),
                  ('hours', 3600), ('minutes', 60), ('seconds', 1))
@@ -106,9 +123,8 @@ def embed_header(data, head_size=96):
         color = 0x222222
 
     embed = discord.Embed(
-        title='**{}** - {}'.format(
-            get_username_history(data['UUID'])[-1].name.replace('_', '\\_'),
-            data['modernRank']['human']),
+        title='**{}** - {}'.format(uuid_to_username(data['UUID']),
+                                   data['modernRank']['human']),
         description=description,
         color=color)
 
