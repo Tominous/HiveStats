@@ -195,19 +195,22 @@ async def get_stats(ctx, uuid=None, game="BP"):
         win_rate = "{:.2%}".format(stats["victories"] / stats["games_played"])
 
         next_rank, diff = get_next_rank(stats["total_points"])
-        content = f"""
-**Rank:** {stats['title']} ({diff} points to {next_rank})
-**Points:** {stats['total_points']}
-**Games Played:** {stats['games_played']}
-**Wins:** {stats['victories']}
-**Placings:** {stats['total_placing']}
-**Eliminations:** {stats['total_eliminations']}
-
-**W/L Ratio:** {win_loss}
-**Win Rate:** {win_rate}"""
 
         if game == "BP":
-            embed.add_field(name="BlockParty Stats", value=content)
+            embed.add_field(
+                name="BlockParty Stats",
+                value=(
+                    f"**Rank:** {stats['title']} ({diff} points to {next_rank})\n"
+                    f"**Points:** {stats['total_points']}\n"
+                    f"**Games Played:** {stats['games_played']}\n"
+                    f"**Wins:** {stats['victories']}\n"
+                    f"**Placings:** {stats['total_placing']}\n"
+                    f"**Eliminations:** {stats['total_eliminations']}\n"
+                    f"\n"
+                    f"**W/L Ratio:** {win_loss}\n"
+                    f"**Win Rate:** {win_rate}"
+                ),
+            )
 
     await ctx.send(embed=embed)
 
@@ -301,15 +304,17 @@ async def compare(ctx, uuid_a=None, uuid_b=None, game='BP'):
 
     embed.add_field(
         name="\u200b",
-        value=f"""**Rank:**
-**Points:**
-**Games Played:**
-**Wins:**
-**Placings:**
-**Eliminations:**
-**W/L Ratio:**
-**Win Rate:**
-**Points per Game:**""",
+        value=(
+            f"**Points:**\n"
+            f"**Games:**\n"
+            f"**Wins:**\n"
+            f"**Placings:**\n"
+            f"**Eliminations:**\n"
+            f"\n"
+            f"**W/L Rate:**\n"
+            f"**Win Rate:**\n"
+            f"**Points per Game:**\n"
+        ),
     )
 
     for i, stat in enumerate(stats):
@@ -317,18 +322,25 @@ async def compare(ctx, uuid_a=None, uuid_b=None, game='BP'):
 
         embed.add_field(
             name=stat["username"],
-            value=f"""
-{stat['total_points']:,} ({stat['total_points'] - other['total_points']:+,})
-{stat['games_played']:,} ({stat['games_played'] - other['games_played']:+,})
-{stat['victories']:,} ({stat['victories'] - other['victories']:+,})
-{stat['total_placing']:,} ({stat['total_placing'] - other['total_placing']:+,})
-{stat['total_eliminations']:,} ({stat['total_eliminations'] - other['total_eliminations']:+,})
-
-{stat['win_rate']:.2%} ({(stat['win_rate'] - other['win_rate']) /
-                         (sum([stat['win_rate'], other['win_rate']]) / 2):+.2%})
-{stat['placing_rate']:.2%} ({(stat['placing_rate'] - other['placing_rate']) /
-                             (sum([stat['placing_rate'], other['placing_rate']]) / 2):+.2%})
-{stat['points_per_game']:.2f} ({stat['points_per_game'] - other['points_per_game']:+.2f})""",
+            value=(
+                f"{stat['total_points']:,} \
+                    ({stat['total_points'] - other['total_points']:+,})\n",
+                f"{stat['games_played']:,} \
+                    ({stat['games_played'] - other['games_played']:+,})\n",
+                f"{stat['victories']:,} \
+                    ({stat['victories'] - other['victories']:+,})\n",
+                f"{stat['total_placing']:,} \
+                    ({stat['total_placing'] - other['total_placing']:+,})\n",
+                f"{stat['total_eliminations']:,} \
+                    ({stat['total_eliminations'] - other['total_eliminations']:+,})\n",
+                f"\n",
+                f"{stat['win_rate']:.2%} \
+                    ({(stat['win_rate'] - other['win_rate']) / (sum([stat['win_rate'], other['win_rate']]) / 2):+.2%})\n",
+                f"{stat['placing_rate']:.2%} \
+                    ({(stat['placing_rate'] - other['placing_rate']) / (sum([stat['placing_rate'], other['placing_rate']]) / 2):+.2%})\n",
+                f"{stat['points_per_game']:.2f} \
+                    ({stat['points_per_game'] - other['points_per_game']:+.2f})\n",
+            ),
         )
 
     await ctx.send(embed=embed)
