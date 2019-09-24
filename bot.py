@@ -10,8 +10,8 @@ import hive_interface as hive
 from content_functions import get_next_rank
 
 
-BOT_PREFIX = "/"
-TOKEN = os.environ["discordToken"]
+BOT_PREFIX = os.environ["BOT_PREFIX"]
+TOKEN = os.environ["DISCORD_TOKEN"]
 
 
 client = Bot(command_prefix=BOT_PREFIX, case_insensitive=True)
