@@ -311,8 +311,8 @@ async def compare(ctx, uuid_a=None, uuid_b=None, game='BP'):
             f"**Placings:**\n"
             f"**Eliminations:**\n"
             f"\n"
-            f"**W/L Rate:**\n"
             f"**Win Rate:**\n"
+            f"**Placings Rate:**\n"
             f"**Points per Game:**\n"
         ),
     )
