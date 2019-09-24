@@ -320,26 +320,34 @@ async def compare(ctx, uuid_a=None, uuid_b=None, game='BP'):
     for i, stat in enumerate(stats):
         other = stats[not i]
 
+        abs_diff = []
+        perc_diff = []
+        abs_diff_dec = []
+
+        for field in [
+            "total_points",
+            "games_played",
+            "victories",
+            "total_placing",
+            "total_eliminations",
+        ]:
+            abs_diff.append(f"{stat[field]:,} ({stat[field] - other[field]:+,})\n")
+
+        for field in ["win_rate", "placing_rate"]:
+            perc_diff.append(
+                f"{stat[field]:.2%} ({(stat[field] - other[field]) / (sum([stat[field], other[field]]) / 2):+.2%})\n"
+            )
+
+        for field in ["points_per_game"]:
+            abs_diff_dec.append(f"{stat[field]:.2f} ({stat[field] - other[field]:+.2f})\n")
+
         embed.add_field(
             name=stat["username"],
             value=(
-                f"{stat['total_points']:,} \
-                    ({stat['total_points'] - other['total_points']:+,})\n",
-                f"{stat['games_played']:,} \
-                    ({stat['games_played'] - other['games_played']:+,})\n",
-                f"{stat['victories']:,} \
-                    ({stat['victories'] - other['victories']:+,})\n",
-                f"{stat['total_placing']:,} \
-                    ({stat['total_placing'] - other['total_placing']:+,})\n",
-                f"{stat['total_eliminations']:,} \
-                    ({stat['total_eliminations'] - other['total_eliminations']:+,})\n",
-                f"\n",
-                f"{stat['win_rate']:.2%} \
-                    ({(stat['win_rate'] - other['win_rate']) / (sum([stat['win_rate'], other['win_rate']]) / 2):+.2%})\n",
-                f"{stat['placing_rate']:.2%} \
-                    ({(stat['placing_rate'] - other['placing_rate']) / (sum([stat['placing_rate'], other['placing_rate']]) / 2):+.2%})\n",
-                f"{stat['points_per_game']:.2f} \
-                    ({stat['points_per_game'] - other['points_per_game']:+.2f})\n",
+                f"{''.join(abs_diff)}"
+                f"\n"
+                f"{''.join(perc_diff)}"
+                f"{''.join(abs_diff_dec)}"
             ),
         )
 
