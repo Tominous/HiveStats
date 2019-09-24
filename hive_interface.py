@@ -1,10 +1,10 @@
 import requests
 
 
-base = 'http://api.hivemc.com/v1/{}'.format
+base = "http://api.hivemc.com/v1/{}".format
 
 
-def player_data(uuid, game=''):
+def player_data(uuid, game=""):
     """Returns data of specified player
 
     Args:
@@ -15,7 +15,7 @@ def player_data(uuid, game=''):
     Returns:
         dict or bool: serialized data for player or False if request failed
     """
-    r = requests.get(base('player/{}/{}'.format(uuid, game)))
+    r = requests.get(base("player/{}/{}".format(uuid, game)))
 
     return r.json() if r.ok else False
 
@@ -37,9 +37,9 @@ def leaderboard(game, start, length=1):
         list(dict) or dict: list of leaderboard entries
     """
     end = min(1000, start + length)
-    r = requests.get(base('game/{}/leaderboard/{}/{}'.format(game, start, end)))
+    r = requests.get(base("game/{}/leaderboard/{}/{}".format(game, start, end)))
 
     if length == 1:
-        return r.json()['leaderboard'][0]
+        return r.json()["leaderboard"][0]
 
-    return r.json()['leaderboard']
+    return r.json()["leaderboard"]

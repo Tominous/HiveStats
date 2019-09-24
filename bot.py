@@ -10,8 +10,8 @@ import hive_interface as hive
 from content_functions import get_next_rank
 
 
-BOT_PREFIX = '/'
-TOKEN = os.environ['discordToken']
+BOT_PREFIX = "/"
+TOKEN = os.environ["discordToken"]
 
 
 client = Bot(command_prefix=BOT_PREFIX, case_insensitive=True)
@@ -19,8 +19,8 @@ client = Bot(command_prefix=BOT_PREFIX, case_insensitive=True)
 
 @client.event
 async def on_ready():
-    print('Logged in as {}: {}'.format(client.user.name, client.user.id))
-    await client.change_presence(activity=discord.Game(name='The Hive'))
+    print("Logged in as {}: {}".format(client.user.name, client.user.id))
+    await client.change_presence(activity=discord.Game(name="The Hive"))
 
 
 def player_head(uuid, size):
@@ -37,7 +37,7 @@ def player_head(uuid, size):
     Returns:
         str: url for the thumbnail image
     """
-    return'https://visage.surgeplay.com/head/{}/{}'.format(size, uuid)
+    return "https://visage.surgeplay.com/head/{}/{}".format(size, uuid)
 
 
 def resolve_username(username):
@@ -51,15 +51,15 @@ def resolve_username(username):
         str: the resolved uuid or error message
     """
     if not username:
-        return False, 'Please provide a username.'
+        return False, "Please provide a username."
 
     if not is_valid_uuid(username):
         try:
             username = get_uuid(username).id
         except AttributeError:
-            return False, 'Username or UUID was not found.'
+            return False, "Username or UUID was not found."
 
-    return True, username.replace('-', '')
+    return True, username.replace("-", "")
 
 
 def uuid_to_username(uuid):
@@ -71,17 +71,23 @@ def uuid_to_username(uuid):
     Returns:
         str or None: current username or None if uuid is invalid
     """
-    uuid = uuid.replace('-', '')
+    uuid = uuid.replace("-", "")
 
     if is_valid_uuid(uuid):
-        return get_username_history(uuid)[-1].name.replace('_', '\\_')
+        return get_username_history(uuid)[-1].name.replace("_", "\\_")
 
     return None
 
 
 def format_interval(seconds, granularity=2):
-    intervals = (('years', 31536000), ('weeks', 604800), ('days', 86400),
-                 ('hours', 3600), ('minutes', 60), ('seconds', 1))
+    intervals = (
+        ("years", 31536000),
+        ("weeks", 604800),
+        ("days", 86400),
+        ("hours", 3600),
+        ("minutes", 60),
+        ("seconds", 1),
+    )
     result = []
 
     for name, length in intervals:
@@ -111,30 +117,33 @@ def embed_header(data, head_size=96):
     """
     current_time = int(datetime.timestamp(datetime.now()))
 
-    if data['lastLogout'] < data['lastLogin']:
-        time_diff = current_time - data['lastLogin']
-        description = '{} {}\nOnline for {}'.format(data['status']['description'],
-                                                    data['status']['game'],
-                                                    format_interval(time_diff, 1)[0])
-        color = 0x00ff00
+    if data["lastLogout"] < data["lastLogin"]:
+        time_diff = current_time - data["lastLogin"]
+        description = "{} {}\nOnline for {}".format(
+            data["status"]["description"],
+            data["status"]["game"],
+            format_interval(time_diff, 1)[0],
+        )
+        color = 0x00FF00
     else:
-        time_diff = current_time - data['lastLogout']
-        description = 'Last seen {} ago'.format(
-            ', '.join(format_interval(time_diff)))
+        time_diff = current_time - data["lastLogout"]
+        description = "Last seen {} ago".format(", ".join(format_interval(time_diff)))
         color = 0x222222
 
     embed = discord.Embed(
-        title='**{}** - {}'.format(uuid_to_username(data['UUID']),
-                                   data['modernRank']['human']),
+        title="**{}** - {}".format(
+            uuid_to_username(data["UUID"]), data["modernRank"]["human"]
+        ),
         description=description,
-        color=color)
+        color=color,
+    )
 
-    embed.set_thumbnail(url=player_head(data['UUID'], head_size))
+    embed.set_thumbnail(url=player_head(data["UUID"], head_size))
 
     return embed
 
 
-@client.command(name='seen')
+@client.command(name="seen")
 async def seen(ctx, username):
     valid, resolved = resolve_username(username)
 
@@ -146,15 +155,15 @@ async def seen(ctx, username):
     data = hive.player_data(uuid)
 
     if not data:
-        await ctx.send('This player has never played on The Hive.')
+        await ctx.send("This player has never played on The Hive.")
         return
 
     embed = embed_header(data, 64)
     await ctx.send(embed=embed)
 
 
-@client.command(name='stats', aliases=['records', 'stat'])
-async def get_stats(ctx, uuid=None, game='BP'):
+@client.command(name="stats", aliases=["records", "stat"])
+async def get_stats(ctx, uuid=None, game="BP"):
     valid, resolved = resolve_username(uuid)
 
     if not valid:
@@ -165,22 +174,28 @@ async def get_stats(ctx, uuid=None, game='BP'):
     data = hive.player_data(uuid)
 
     if not data:
-        await ctx.send('This player has never played on The Hive.')
+        await ctx.send("This player has never played on The Hive.")
         return
 
     embed = embed_header(data)
     stats = hive.player_data(uuid, game)
 
     if not stats:
-        embed.add_field(name='BlockParty Stats',
-                        value='This player has never played BlockParty.')
+        embed.add_field(
+            name="BlockParty Stats", value="This player has never played BlockParty."
+        )
     else:
-        win_loss = ('Infinity' if stats['games_played'] == stats['victories'] else
-                    '{:.2f}'.format(stats['victories'] / (stats['games_played'] - stats['victories'])))
-        win_rate = '{:.2%}'.format(stats['victories'] / stats['games_played'])
+        win_loss = (
+            "Infinity"
+            if stats["games_played"] == stats["victories"]
+            else "{:.2f}".format(
+                stats["victories"] / (stats["games_played"] - stats["victories"])
+            )
+        )
+        win_rate = "{:.2%}".format(stats["victories"] / stats["games_played"])
 
-        next_rank, diff = get_next_rank(stats['total_points'])
-        content = f'''
+        next_rank, diff = get_next_rank(stats["total_points"])
+        content = f"""
 **Rank:** {stats['title']} ({diff} points to {next_rank})
 **Points:** {stats['total_points']}
 **Games Played:** {stats['games_played']}
@@ -189,18 +204,18 @@ async def get_stats(ctx, uuid=None, game='BP'):
 **Eliminations:** {stats['total_eliminations']}
 
 **W/L Ratio:** {win_loss}
-**Win Rate:** {win_rate}'''
+**Win Rate:** {win_rate}"""
 
-        if game == 'BP':
-            embed.add_field(name='BlockParty Stats', value=content)
+        if game == "BP":
+            embed.add_field(name="BlockParty Stats", value=content)
 
     await ctx.send(embed=embed)
 
 
-@client.command(name='names', aliases=['history', 'namemc'])
+@client.command(name="names", aliases=["history", "namemc"])
 async def get_names(ctx, uuid=None, count: int = None):
     if count and count <= 0:
-        await ctx.send('Please input a number larger than 0.')
+        await ctx.send("Please input a number larger than 0.")
         return
 
     valid, resolved = resolve_username(uuid)
@@ -213,18 +228,19 @@ async def get_names(ctx, uuid=None, count: int = None):
     response = get_username_history(uuid)
     count = len(response) if count is None else count
 
-    names = [entry.name.replace('_', '\\_') for entry in response[::-1]]
+    names = [entry.name.replace("_", "\\_") for entry in response[::-1]]
     # Java timestamps are returned which are in millisecs, so we divide by 1000
-    times = [datetime.fromtimestamp(entry.changedToAt / 1000).strftime('%d %b, %Y %H:%M')
-             for entry in response[:0:-1]]
-    times.append('(Original Name)')
+    times = [
+        datetime.fromtimestamp(entry.changedToAt / 1000).strftime("%d %b, %Y %H:%M")
+        for entry in response[:0:-1]
+    ]
+    times.append("(Original Name)")
 
     # Trim down lists to requested size
     names, times = names[:count], times[:count]
 
     embed = discord.Embed(
-        title='**{}\'s Name History**'.format(names[0]),
-        color=0xffa500
+        title="**{}'s Name History**".format(names[0]), color=0xFFA500
     )
 
     embed.set_thumbnail(url=player_head(uuid, 96))
@@ -232,11 +248,18 @@ async def get_names(ctx, uuid=None, count: int = None):
     batch_size = 20
 
     for i in range(0, len(names), batch_size):
-        embed.add_field(name='\u200b',
-                        value='\n'.join(['**{}** - {}'.format(name, time)
-                                         for name, time in zip(names[i:i + batch_size],
-                                                               times[i:i + batch_size])]),
-                        inline=False)
+        embed.add_field(
+            name="\u200b",
+            value="\n".join(
+                [
+                    "**{}** - {}".format(name, time)
+                    for name, time in zip(
+                        names[i : i + batch_size], times[i : i + batch_size]
+                    )
+                ]
+            ),
+            inline=False,
+        )
 
     await ctx.send(embed=embed)
 
@@ -259,24 +282,26 @@ async def compare(ctx, uuid_a=None, uuid_b=None, game='BP'):
 
     for uuid, stat in zip(resolved_uuids, stats):
         if not stat:
-            await ctx.send('**{}** has never played BlockParty.'.format(
-                uuid_to_username(uuid)))
+            await ctx.send(
+                "**{}** has never played BlockParty.".format(uuid_to_username(uuid))
+            )
             return
 
-        stat['username'] = uuid_to_username(uuid)
-        stat['win_rate'] = stat['victories'] / stat['games_played']
-        stat['placing_rate'] = stat['total_placing'] / stat['games_played']
-        stat['points_per_game'] = stat['total_points'] / stat['games_played']
+        stat["username"] = uuid_to_username(uuid)
+        stat["win_rate"] = stat["victories"] / stat["games_played"]
+        stat["placing_rate"] = stat["total_placing"] / stat["games_played"]
+        stat["points_per_game"] = stat["total_points"] / stat["games_played"]
 
     embed = discord.Embed(
-        title='{} and {} Stats Comparison'.format(
-            stats[0]['username'], stats[1]['username']),
-        description='',
+        title="{} and {} Stats Comparison".format(
+            stats[0]["username"], stats[1]["username"]
+        ),
+        description="",
     )
 
     embed.add_field(
-        name='\u200b',
-        value=f'''**Rank:**
+        name="\u200b",
+        value=f"""**Rank:**
 **Points:**
 **Games Played:**
 **Wins:**
@@ -284,15 +309,15 @@ async def compare(ctx, uuid_a=None, uuid_b=None, game='BP'):
 **Eliminations:**
 **W/L Ratio:**
 **Win Rate:**
-**Points per Game:**'''
+**Points per Game:**""",
     )
 
     for i, stat in enumerate(stats):
         other = stats[not i]
 
         embed.add_field(
-            name=stat['username'],
-            value=f'''
+            name=stat["username"],
+            value=f"""
 {stat['total_points']:,} ({stat['total_points'] - other['total_points']:+,})
 {stat['games_played']:,} ({stat['games_played'] - other['games_played']:+,})
 {stat['victories']:,} ({stat['victories'] - other['victories']:+,})
@@ -303,9 +328,10 @@ async def compare(ctx, uuid_a=None, uuid_b=None, game='BP'):
                          (sum([stat['win_rate'], other['win_rate']]) / 2):+.2%})
 {stat['placing_rate']:.2%} ({(stat['placing_rate'] - other['placing_rate']) /
                              (sum([stat['placing_rate'], other['placing_rate']]) / 2):+.2%})
-{stat['points_per_game']:.2f} ({stat['points_per_game'] - other['points_per_game']:+.2f})'''
+{stat['points_per_game']:.2f} ({stat['points_per_game'] - other['points_per_game']:+.2f})""",
         )
 
     await ctx.send(embed=embed)
+
 
 client.run(TOKEN)
