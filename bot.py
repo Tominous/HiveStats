@@ -1,6 +1,7 @@
 import os
 import discord
 from datetime import datetime
+from functools import partial
 
 from discord.ext.commands import Bot
 from mojang_api import get_uuid, is_valid_uuid, get_username_history
@@ -239,5 +240,72 @@ async def get_names(ctx, uuid=None, count: int = None):
 
     await ctx.send(embed=embed)
 
+
+@client.command(name='compare')
+async def compare(ctx, uuid_a=None, uuid_b=None, game='BP'):
+    resolved_uuids = []
+
+    for i, uuid in enumerate([uuid_a, uuid_b]):
+        valid, resolved = resolve_username(uuid)
+
+        if not valid:
+            await ctx.send(resolved)
+            return
+
+        resolved_uuids.append(resolved)
+
+    get_stats = partial(hive.player_data, game=game)
+    stats = [get_stats(resolved_uuids[0]), get_stats(resolved_uuids[1])]
+
+    for uuid, stat in zip(resolved_uuids, stats):
+        if not stat:
+            await ctx.send('**{}** has never played BlockParty.'.format(
+                uuid_to_username(uuid)))
+            return
+
+        stat['username'] = uuid_to_username(uuid)
+        stat['win_rate'] = stat['victories'] / stat['games_played']
+        stat['placing_rate'] = stat['total_placing'] / stat['games_played']
+        stat['points_per_game'] = stat['total_points'] / stat['games_played']
+
+    embed = discord.Embed(
+        title='{} and {} Stats Comparison'.format(
+            stats[0]['username'], stats[1]['username']),
+        description='',
+    )
+
+    embed.add_field(
+        name='\u200b',
+        value=f'''**Rank:**
+**Points:**
+**Games Played:**
+**Wins:**
+**Placings:**
+**Eliminations:**
+**W/L Ratio:**
+**Win Rate:**
+**Points per Game:**'''
+    )
+
+    for i, stat in enumerate(stats):
+        other = stats[not i]
+
+        embed.add_field(
+            name=stat['username'],
+            value=f'''
+{stat['total_points']:,} ({stat['total_points'] - other['total_points']:+,})
+{stat['games_played']:,} ({stat['games_played'] - other['games_played']:+,})
+{stat['victories']:,} ({stat['victories'] - other['victories']:+,})
+{stat['total_placing']:,} ({stat['total_placing'] - other['total_placing']:+,})
+{stat['total_eliminations']:,} ({stat['total_eliminations'] - other['total_eliminations']:+,})
+
+{stat['win_rate']:.2%} ({(stat['win_rate'] - other['win_rate']) /
+                         (sum([stat['win_rate'], other['win_rate']]) / 2):+.2%})
+{stat['placing_rate']:.2%} ({(stat['placing_rate'] - other['placing_rate']) /
+                             (sum([stat['placing_rate'], other['placing_rate']]) / 2):+.2%})
+{stat['points_per_game']:.2f} ({stat['points_per_game'] - other['points_per_game']:+.2f})'''
+        )
+
+    await ctx.send(embed=embed)
 
 client.run(TOKEN)
