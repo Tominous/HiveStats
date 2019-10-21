@@ -2,6 +2,7 @@ import os
 import discord
 from datetime import datetime
 from functools import partial
+from asyncio import TimeoutError
 
 from discord.ext.commands import Bot
 from mojang_api import get_uuid, is_valid_uuid, get_username_history
@@ -14,9 +15,10 @@ BOT_PREFIX = os.environ["BOT_PREFIX"]
 TOKEN = os.environ["DISCORD_TOKEN"]
 
 
-BATCH_SIZE = 20
-REACTION_TIMEOUT = 600
-LEADERBOARD_LENGTH = 1000
+BATCH_SIZE = 20  # Number of rows returned for commands that return a batch
+LEADERBOARD_LENGTH = 1000  # Number of players on the Hive leaderboard
+
+REACTION_TIMEOUT = 600  # Timeout for reaction based interfaces
 
 client = Bot(command_prefix=BOT_PREFIX, case_insensitive=True)
 
@@ -368,7 +370,7 @@ async def leaderboard(ctx, page=1, game="BP"):
         data = hive.leaderboard(game, BATCH_SIZE * page, BATCH_SIZE)
         embed = discord.Embed(title="**{} Leaderboard**".format(game, color=0xFFA500))
         embed.set_author(name=ctx.author)
-        embed.set_footer(text=page + 1)
+        embed.set_footer(text=f"Current page: {page + 1}")
         embed.add_field(
             name="#    Player",
             value="\n".join(
@@ -383,30 +385,34 @@ async def leaderboard(ctx, page=1, game="BP"):
         return embed
 
     msg = await ctx.send(embed=create_embed(page, game))
-    created = datetime.now()
+    created = msg.created_at
     await msg.add_reaction("\u2B05")
     await msg.add_reaction("\u27A1")
 
     async def runChecks(page):
         try:
-            reaction, user = await client.wait_for("reaction_add")
-        except Exception:  # TO-DO add timeout as the exception.
+            payload = await client.wait_for("raw_reaction_add")
+        except TimeoutError:
             await msg.clear_reactions()
         else:
-            emoji_text = str(reaction.emoji)
+            emoji = str(payload.emoji.name)
 
-            if user == ctx.author and emoji_text in ("\u2B05", "\u27A1"):
-                await msg.remove_reaction(str(reaction.emoji), user)
+            if (
+                payload.message_id == msg.id
+                and payload.user_id == ctx.author.id
+                and emoji in ("\u2B05", "\u27A1")
+            ):
+                await msg.remove_reaction(emoji, ctx.author)
 
-                if emoji_text == "\u2B05":
+                if emoji == "\u2B05":
                     page -= 1
-                elif emoji_text == "\u27A1":
+                elif emoji == "\u27A1":
                     page += 1
 
                 page %= int(LEADERBOARD_LENGTH / BATCH_SIZE)
                 await msg.edit(embed=create_embed(page, game))
 
-            if (datetime.now() - created).total_seconds() < REACTION_TIMEOUT:
+            if (datetime.utcnow() - created).total_seconds() < REACTION_TIMEOUT:
                 await runChecks(page)
             else:
                 await msg.clear_reactions()
