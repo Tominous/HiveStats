@@ -14,6 +14,10 @@ BOT_PREFIX = os.environ["BOT_PREFIX"]
 TOKEN = os.environ["DISCORD_TOKEN"]
 
 
+BATCH_SIZE = 20
+REACTION_TIMEOUT = 600
+LEADERBOARD_LENGTH = 1000
+
 client = Bot(command_prefix=BOT_PREFIX, case_insensitive=True)
 
 
@@ -267,8 +271,8 @@ async def get_names(ctx, uuid=None, count: int = None):
     await ctx.send(embed=embed)
 
 
-@client.command(name='compare')
-async def compare(ctx, uuid_a=None, uuid_b=None, game='BP'):
+@client.command(name="compare")
+async def compare(ctx, uuid_a=None, uuid_b=None, game="BP"):
     resolved_uuids = []
 
     for i, uuid in enumerate([uuid_a, uuid_b]):
@@ -339,7 +343,9 @@ async def compare(ctx, uuid_a=None, uuid_b=None, game='BP'):
             )
 
         for field in ["points_per_game"]:
-            abs_diff_dec.append(f"{stat[field]:.2f} ({stat[field] - other[field]:+.2f})\n")
+            abs_diff_dec.append(
+                f"{stat[field]:.2f} ({stat[field] - other[field]:+.2f})\n"
+            )
 
         embed.add_field(
             name=stat["username"],
@@ -353,5 +359,58 @@ async def compare(ctx, uuid_a=None, uuid_b=None, game='BP'):
 
     await ctx.send(embed=embed)
 
+
+@client.command(name="leaderboard")
+async def leaderboard(ctx, page=1, game="BP"):
+    page -= 1
+
+    def create_embed(page, game):
+        data = hive.leaderboard(game, BATCH_SIZE * page, BATCH_SIZE)
+        embed = discord.Embed(title="**{} Leaderboard**".format(game, color=0xFFA500))
+        embed.set_author(name=ctx.author)
+        embed.set_footer(text=page + 1)
+        embed.add_field(
+            name="#    Player",
+            value="\n".join(
+                [f"{entry['humanIndex']}) **{entry['username']}**" for entry in data]
+            ),
+        )
+
+        embed.add_field(
+            name="Points",
+            value="\n".join([f"{entry['total_points']:,}" for entry in data]),
+        )
+        return embed
+
+    msg = await ctx.send(embed=create_embed(page, game))
+    created = datetime.now()
+    await msg.add_reaction("\u2B05")
+    await msg.add_reaction("\u27A1")
+
+    async def runChecks(page):
+        try:
+            reaction, user = await client.wait_for("reaction_add")
+        except Exception:  # TO-DO add timeout as the exception.
+            await msg.clear_reactions()
+        else:
+            emoji_text = str(reaction.emoji)
+
+            if user == ctx.author and emoji_text in ("\u2B05", "\u27A1"):
+                await msg.remove_reaction(str(reaction.emoji), user)
+
+                if emoji_text == "\u2B05":
+                    page -= 1
+                elif emoji_text == "\u27A1":
+                    page += 1
+
+                page %= int(LEADERBOARD_LENGTH / BATCH_SIZE)
+                await msg.edit(embed=create_embed(page, game))
+
+            if (datetime.now() - created).total_seconds() < REACTION_TIMEOUT:
+                await runChecks(page)
+            else:
+                await msg.clear_reactions()
+
+    await runChecks(page)
 
 client.run(TOKEN)
