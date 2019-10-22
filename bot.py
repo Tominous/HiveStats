@@ -20,7 +20,7 @@ LEADERBOARD_LENGTH = 1000  # Number of players on the Hive leaderboard
 
 REACTION_TIMEOUT = 600  # Timeout for reaction based interfaces
 
-reactions = {
+REACTIONS = {
     "rewind": "\u23EA",
     "left_arrow": "\u25C0",
     "right_arrow": "\u25B6",
@@ -93,7 +93,14 @@ def uuid_to_username(uuid):
 
 
 def format_username(username):
-    """Formats username to support discord formatting"""
+    """Reformats usernames to avoid chars in name causing unwanted discord formatting
+
+    Args:
+        username (str): username to be reformatted
+
+    Returns:
+        str: name with certain characters replaced with appropriate escape sequences
+        """
     return username.replace("_", "\\_")
 
 
@@ -376,11 +383,6 @@ async def compare(ctx, uuid_a=None, uuid_b=None, game="BP"):
 
 @client.command(name="leaderboard")
 async def leaderboard(ctx, page=1, game="BP"):
-    """
-    Displays the game leaderboard with username and points in an embed.
-    Adds reaction arrows to change pages.
-    Does not support DM reactions. 
-    """
     page -= 1
 
     def create_embed(page, game):
@@ -406,10 +408,10 @@ async def leaderboard(ctx, page=1, game="BP"):
 
     msg = await ctx.send(embed=create_embed(page, game))
     created = msg.created_at
-    await msg.add_reaction(reactions["rewind"])
-    await msg.add_reaction(reactions["left_arrow"])
-    await msg.add_reaction(reactions["right_arrow"])
-    await msg.add_reaction(reactions["fast_forward"])
+    await msg.add_reaction(REACTIONS["rewind"])
+    await msg.add_reaction(REACTIONS["left_arrow"])
+    await msg.add_reaction(REACTIONS["right_arrow"])
+    await msg.add_reaction(REACTIONS["fast_forward"])
 
     async def run_checks(page):
         try:
@@ -424,21 +426,21 @@ async def leaderboard(ctx, page=1, game="BP"):
                 and payload.user_id == ctx.author.id
                 and emoji
                 in (
-                    reactions["rewind"],
-                    reactions["left_arrow"],
-                    reactions["right_arrow"],
-                    reactions["fast_forward"],
+                    REACTIONS["rewind"],
+                    REACTIONS["left_arrow"],
+                    REACTIONS["right_arrow"],
+                    REACTIONS["fast_forward"],
                 )
             ):
                 await msg.remove_reaction(emoji, ctx.author)
 
-                if emoji == reactions["rewind"]:
+                if emoji == REACTIONS["rewind"]:
                     page = 0
-                elif emoji == reactions["left_arrow"]:
+                elif emoji == REACTIONS["left_arrow"]:
                     page -= 1
-                elif emoji == reactions["right_arrow"]:
+                elif emoji == REACTIONS["right_arrow"]:
                     page += 1
-                elif emoji == reactions["fast_forward"]:
+                elif emoji == REACTIONS["fast_forward"]:
                     page = 49
 
                 page %= int(LEADERBOARD_LENGTH / BATCH_SIZE)
