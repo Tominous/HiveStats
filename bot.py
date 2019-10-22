@@ -369,13 +369,13 @@ async def leaderboard(ctx, page=1, game="BP"):
     def create_embed(page, game):
         data = hive.leaderboard(game, BATCH_SIZE * page, BATCH_SIZE)
         embed = discord.Embed(title="**{} Leaderboard**".format(game, color=0xFFA500))
-        embed.set_author(name=ctx.author)
+        embed.set_author(name=ctx.author, icon_url=ctx.author.avatar_url)
         embed.set_footer(text=f"Current page: {page + 1}")
         embed.add_field(
             name="#    Player",
             value="\n".join(
                 [f"{entry['humanIndex']}) **{entry['username']}**" for entry in data]
-            ),
+            ).replace("_","\\_"),
         )
 
         embed.add_field(
@@ -386,10 +386,12 @@ async def leaderboard(ctx, page=1, game="BP"):
 
     msg = await ctx.send(embed=create_embed(page, game))
     created = msg.created_at
-    await msg.add_reaction("\u2B05")
-    await msg.add_reaction("\u27A1")
+    await msg.add_reaction("\u23EA")
+    await msg.add_reaction("\u25C0")
+    await msg.add_reaction("\u25B6")
+    await msg.add_reaction("\u23E9")
 
-    async def runChecks(page):
+    async def run_checks(page):
         try:
             payload = await client.wait_for("raw_reaction_add")
         except TimeoutError:
@@ -400,23 +402,28 @@ async def leaderboard(ctx, page=1, game="BP"):
             if (
                 payload.message_id == msg.id
                 and payload.user_id == ctx.author.id
-                and emoji in ("\u2B05", "\u27A1")
+                and emoji in ("\u23EA", "\u25C0", "\u25B6", "\u23E9")
             ):
                 await msg.remove_reaction(emoji, ctx.author)
 
-                if emoji == "\u2B05":
+                if emoji == "\u23EA":
+                    page = 0
+                elif emoji == "\u25C0":
                     page -= 1
-                elif emoji == "\u27A1":
+                elif emoji == "\u25B6":
                     page += 1
+                elif emoji == "\u23E9":
+                    page = 49
 
                 page %= int(LEADERBOARD_LENGTH / BATCH_SIZE)
                 await msg.edit(embed=create_embed(page, game))
 
             if (datetime.utcnow() - created).total_seconds() < REACTION_TIMEOUT:
-                await runChecks(page)
+                await run_checks(page)
             else:
                 await msg.clear_reactions()
 
-    await runChecks(page)
+    await run_checks(page)
+
 
 client.run(TOKEN)
