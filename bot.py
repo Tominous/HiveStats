@@ -20,6 +20,13 @@ LEADERBOARD_LENGTH = 1000  # Number of players on the Hive leaderboard
 
 REACTION_TIMEOUT = 600  # Timeout for reaction based interfaces
 
+reactions = {
+    "rewind": "\u23EA",
+    "left_arrow": "\u25C0",
+    "right_arrow": "\u25B6",
+    "fast_forward": "\u23E9",
+}
+
 client = Bot(command_prefix=BOT_PREFIX, case_insensitive=True)
 
 
@@ -80,9 +87,14 @@ def uuid_to_username(uuid):
     uuid = uuid.replace("-", "")
 
     if is_valid_uuid(uuid):
-        return get_username_history(uuid)[-1].name.replace("_", "\\_")
+        return format_username(get_username_history(uuid)[-1].name)
 
     return None
+
+
+def format_username(username):
+    """Formats username to support discord formatting"""
+    return username.replace("_", "\\_")
 
 
 def format_interval(seconds, granularity=2):
@@ -237,7 +249,7 @@ async def get_names(ctx, uuid=None, count: int = None):
     response = get_username_history(uuid)
     count = len(response) if count is None else count
 
-    names = [entry.name.replace("_", "\\_") for entry in response[::-1]]
+    names = [format_username(entry.name) for entry in response[::-1]]
     # Java timestamps are returned which are in millisecs, so we divide by 1000
     times = [
         datetime.fromtimestamp(entry.changedToAt / 1000).strftime("%d %b, %Y %H:%M")
@@ -364,6 +376,11 @@ async def compare(ctx, uuid_a=None, uuid_b=None, game="BP"):
 
 @client.command(name="leaderboard")
 async def leaderboard(ctx, page=1, game="BP"):
+    """
+    Displays the game leaderboard with username and points in an embed.
+    Adds reaction arrows to change pages.
+    Does not support DM reactions. 
+    """
     page -= 1
 
     def create_embed(page, game):
@@ -374,8 +391,11 @@ async def leaderboard(ctx, page=1, game="BP"):
         embed.add_field(
             name="#    Player",
             value="\n".join(
-                [f"{entry['humanIndex']}) **{entry['username']}**" for entry in data]
-            ).replace("_","\\_"),
+                [
+                    f"{entry['humanIndex']}) **{format_username(entry['username'])}**"
+                    for entry in data
+                ]
+            ),
         )
 
         embed.add_field(
@@ -386,10 +406,10 @@ async def leaderboard(ctx, page=1, game="BP"):
 
     msg = await ctx.send(embed=create_embed(page, game))
     created = msg.created_at
-    await msg.add_reaction("\u23EA")
-    await msg.add_reaction("\u25C0")
-    await msg.add_reaction("\u25B6")
-    await msg.add_reaction("\u23E9")
+    await msg.add_reaction(reactions["rewind"])
+    await msg.add_reaction(reactions["left_arrow"])
+    await msg.add_reaction(reactions["right_arrow"])
+    await msg.add_reaction(reactions["fast_forward"])
 
     async def run_checks(page):
         try:
@@ -402,17 +422,23 @@ async def leaderboard(ctx, page=1, game="BP"):
             if (
                 payload.message_id == msg.id
                 and payload.user_id == ctx.author.id
-                and emoji in ("\u23EA", "\u25C0", "\u25B6", "\u23E9")
+                and emoji
+                in (
+                    reactions["rewind"],
+                    reactions["left_arrow"],
+                    reactions["right_arrow"],
+                    reactions["fast_forward"],
+                )
             ):
                 await msg.remove_reaction(emoji, ctx.author)
 
-                if emoji == "\u23EA":
+                if emoji == reactions["rewind"]:
                     page = 0
-                elif emoji == "\u25C0":
+                elif emoji == reactions["left_arrow"]:
                     page -= 1
-                elif emoji == "\u25B6":
+                elif emoji == reactions["right_arrow"]:
                     page += 1
-                elif emoji == "\u23E9":
+                elif emoji == reactions["fast_forward"]:
                     page = 49
 
                 page %= int(LEADERBOARD_LENGTH / BATCH_SIZE)
