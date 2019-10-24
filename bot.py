@@ -3,12 +3,14 @@ import discord
 from datetime import datetime
 from functools import partial
 from asyncio import TimeoutError
+from multiprocessing import Process
 
 from discord.ext.commands import Bot
 from mojang_api import get_uuid, is_valid_uuid, get_username_history
 
 from hivestats import hive_api as hive
 from hivestats.content_functions import get_next_rank
+from hivestats.database import scheduled_update
 
 
 BOT_PREFIX = os.environ["BOT_PREFIX"]
@@ -28,6 +30,18 @@ REACTIONS = {
 }
 
 client = Bot(command_prefix=BOT_PREFIX, case_insensitive=True)
+
+
+def run_bot():
+    """Packaged function for multiprocessing, starts bot
+    """
+    client.run(TOKEN)
+
+
+def update_leaderboard():
+    """Packaged function for multiprocessing, starts leaderboard caching
+    """
+    scheduled_update()
 
 
 @client.event
@@ -454,4 +468,6 @@ async def leaderboard(ctx, page=1, game="BP"):
     await run_checks(page)
 
 
-client.run(TOKEN)
+if __name__ == '__main__':
+    Process(target=run_bot).start()
+    Process(target=update_leaderboard).start()
