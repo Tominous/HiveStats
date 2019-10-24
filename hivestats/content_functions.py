@@ -1,5 +1,5 @@
 from functools import reduce
-from hive_interface import leaderboard
+from .hive_api import leaderboard
 
 
 RANK_DICT = {

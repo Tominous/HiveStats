@@ -7,8 +7,8 @@ from asyncio import TimeoutError
 from discord.ext.commands import Bot
 from mojang_api import get_uuid, is_valid_uuid, get_username_history
 
-import hive_interface as hive
-from content_functions import get_next_rank
+from hivestats import hive_api as hive
+from hivestats.content_functions import get_next_rank
 
 
 BOT_PREFIX = os.environ["BOT_PREFIX"]
