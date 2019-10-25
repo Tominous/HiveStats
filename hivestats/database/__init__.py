@@ -1,1 +1,1 @@
-from .leaderboard import scheduled_update
+from .sql import Postgres

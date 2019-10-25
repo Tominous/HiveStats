@@ -1,6 +1,7 @@
 import os
 import psycopg2
 from psycopg2.extensions import AsIs, ISOLATION_LEVEL_AUTOCOMMIT
+from psycopg2.extras import DictCursor
 
 
 class Postgres:
@@ -13,7 +14,7 @@ class Postgres:
         )
 
         self._conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
-        self.cursor = self._conn.cursor()
+        self.cursor = self._conn.cursor(cursor_factory=DictCursor)
 
     def __enter__(self):
         return self
@@ -59,12 +60,15 @@ class Postgres:
         """
 
         temp_table = f"{table}_temp"
+        old_table = f"{table}_old"
 
         self.create_table(temp_table, columns, types)
         self.insert(temp_table, columns, values)
 
-        self.drop_table(table)
+        self.rename_table(table, old_table)
         self.rename_table(temp_table, table)
+
+        self.drop_table(old_table)
 
     def drop_table(self, name):
         """Drop table if it exists

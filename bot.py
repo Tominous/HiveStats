@@ -10,7 +10,8 @@ from mojang_api import get_uuid, is_valid_uuid, get_username_history
 
 from hivestats import hive_api as hive
 from hivestats.content_functions import get_next_rank
-from hivestats.database import scheduled_update
+from hivestats.database import Postgres
+import hivestats.database.leaderboard as db_leaderboard
 
 
 BOT_PREFIX = os.environ["BOT_PREFIX"]
@@ -30,6 +31,7 @@ REACTIONS = {
 }
 
 client = Bot(command_prefix=BOT_PREFIX, case_insensitive=True)
+database = Postgres()
 
 
 def run_bot():
@@ -41,7 +43,7 @@ def run_bot():
 def update_leaderboard():
     """Packaged function for multiprocessing, starts leaderboard caching
     """
-    scheduled_update()
+    db_leaderboard.scheduled_update()
 
 
 @client.event
@@ -400,15 +402,16 @@ async def leaderboard(ctx, page=1, game="BP"):
     page -= 1
 
     def create_embed(page, game):
-        data = hive.leaderboard(game, BATCH_SIZE * page, BATCH_SIZE)
-        embed = discord.Embed(title="**{} Leaderboard**".format(game, color=0xFFA500))
+        data = db_leaderboard.query_leaderboard(database, game, BATCH_SIZE * page, BATCH_SIZE)
+
+        embed = discord.Embed(title="**{} Leaderboard**".format(game), color=0xFFA500)
         embed.set_author(name=ctx.author, icon_url=ctx.author.avatar_url)
         embed.set_footer(text=f"Current page: {page + 1}")
         embed.add_field(
             name="#    Player",
             value="\n".join(
                 [
-                    f"{entry['humanIndex']}) **{format_username(entry['username'])}**"
+                    f"{entry['human_index']}) **{format_username(entry['username'])}**"
                     for entry in data
                 ]
             ),
@@ -416,7 +419,7 @@ async def leaderboard(ctx, page=1, game="BP"):
 
         embed.add_field(
             name="Points",
-            value="\n".join([f"{entry['total_points']:,}" for entry in data]),
+            value="\n".join([f"{entry['points']:,}" for entry in data]),
         )
         return embed
 
