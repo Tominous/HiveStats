@@ -22,6 +22,7 @@ BATCH_SIZE = 20  # Number of rows returned for commands that return a batch
 LEADERBOARD_LENGTH = 1000  # Number of players on the Hive leaderboard
 
 REACTION_TIMEOUT = 600  # Timeout for reaction based interfaces
+REACTION_POLLING_FREQ = 60  # Frequency at which reaction checks auto-timeout
 
 REACTIONS = {
     "rewind": "\u23EA",
@@ -432,7 +433,7 @@ async def leaderboard(ctx, page=1, game="BP"):
 
     async def run_checks(page):
         try:
-            payload = await client.wait_for("raw_reaction_add")
+            payload = await client.wait_for("raw_reaction_add", timeout=REACTION_POLLING_FREQ)
         except TimeoutError:
             await msg.clear_reactions()
         else:
