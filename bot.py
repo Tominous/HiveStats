@@ -425,7 +425,7 @@ async def leaderboard(ctx, page=1, game="BP"):
         return embed
 
     msg = await ctx.send(embed=create_embed(page, game))
-    created = msg.created_at
+
     await msg.add_reaction(REACTIONS["rewind"])
     await msg.add_reaction(REACTIONS["left_arrow"])
     await msg.add_reaction(REACTIONS["right_arrow"])
@@ -435,7 +435,7 @@ async def leaderboard(ctx, page=1, game="BP"):
         try:
             payload = await client.wait_for("raw_reaction_add", timeout=REACTION_POLLING_FREQ)
         except TimeoutError:
-            await msg.clear_reactions()
+            pass
         else:
             emoji = str(payload.emoji.name)
 
@@ -453,21 +453,21 @@ async def leaderboard(ctx, page=1, game="BP"):
                 await msg.remove_reaction(emoji, ctx.author)
 
                 if emoji == REACTIONS["rewind"]:
-                    page = 0
+                    page -= 10
                 elif emoji == REACTIONS["left_arrow"]:
                     page -= 1
                 elif emoji == REACTIONS["right_arrow"]:
                     page += 1
                 elif emoji == REACTIONS["fast_forward"]:
-                    page = 49
+                    page += 10
 
                 page %= int(LEADERBOARD_LENGTH / BATCH_SIZE)
                 await msg.edit(embed=create_embed(page, game))
 
-            if (datetime.utcnow() - created).total_seconds() < REACTION_TIMEOUT:
-                await run_checks(page)
-            else:
-                await msg.clear_reactions()
+        if (datetime.utcnow() - msg.created_at).total_seconds() < REACTION_TIMEOUT:
+            await run_checks(page)
+        else:
+            await msg.clear_reactions()
 
     await run_checks(page)
 
