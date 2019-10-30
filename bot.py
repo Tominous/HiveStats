@@ -398,8 +398,12 @@ async def compare(ctx, uuid_a=None, uuid_b=None, game="BP"):
     await ctx.send(embed=embed)
 
 
-@client.command(name="leaderboard")
+@client.command(name="leaderboard", aliases=["leaderboards", "lb"])
 async def leaderboard(ctx, page=1, game="BP"):
+    if page < 1 or page > 50:
+        await ctx.send("Please input a page number between 1-50.")
+        return
+
     page -= 1
 
     def create_embed(page, game):
