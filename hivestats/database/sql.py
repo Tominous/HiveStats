@@ -130,7 +130,7 @@ class Postgres:
             {"name": AsIs(name), "new_name": AsIs(new_name)},
         )
 
-    def insert(self, table, columns, values):
+    def insert(self, table, columns, values, *, conflict_key=None):
         """Insert new values into existing table
 
         Args:
@@ -138,14 +138,56 @@ class Postgres:
             columns (Tuple[str]): tuple of columns to insert values into
             values (Tuple(Tuple(Any))): values to be inserted into new table
         """
+        conflict_clause = ""
+
+        if conflict_key:
+            mapping = ", ".join([f"{col} = excluded.{col}" for col in columns])
+            conflict_clause = f"""
+                on conflict ({conflict_key}) do update
+                    set {mapping}"""
+
         self.cursor.execute(
             """
                 insert into %(table)s (%(columns)s)
-                    values %(values)s;
+                    values %(values)s
+                %(conflict)s;
             """,
             {
                 "table": AsIs(table),
                 "columns": AsIs(", ".join(columns)),
                 "values": AsIs(", ".join([str(row) for row in values])),
+                "conflict": AsIs(conflict_clause),
             },
         )
+
+    def add_constraint(
+        self, table, column, constraint, constraint_name=None, *, raise_error=True
+    ):
+        """Add constraint to a specific column in a table
+
+        Args:
+            table (str): name of table that column is in
+            column (str): name of column to add constraint to
+            constraint (str): the type of constraint to add
+            constraint_name (str, optional): specific name for constraint, set to
+                                             {table}_{column}_{constraint} by default
+        """
+        if not constraint_name:
+            constraint_name = f"{table}_{column}_{constraint}"
+
+        try:
+            self.cursor.execute(
+                """
+                    alter table %(table)s
+                        add constraint %(constraint_name)s %(constraint)s (%(column)s)
+                """,
+                {
+                    "table": AsIs(table),
+                    "column": AsIs(column),
+                    "constraint": AsIs(constraint),
+                    "constraint_name": AsIs(constraint_name),
+                },
+            )
+        except DuplicateTable:
+            if raise_error:
+                raise DuplicateTable(f"Constraint {constraint_name} already exists")
