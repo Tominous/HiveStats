@@ -2,6 +2,7 @@ import os
 import psycopg2
 from psycopg2.extensions import AsIs, ISOLATION_LEVEL_AUTOCOMMIT
 from psycopg2.extras import DictCursor
+from psycopg2.errors import DuplicateTable
 
 
 class Postgres:
@@ -22,7 +23,30 @@ class Postgres:
     def __exit__(self, exc_type, exc_value, traceback):
         self._conn.close()
 
-    def create_table(self, table, columns=None, types=None):
+    def table_exists(self, table):
+        """Check if a table exists
+
+        Args:
+            table (str): name of table to checks
+
+        Returns:
+            bool: whether table exists
+        """
+        self.cursor.execute(
+            """
+                select exists(
+                    select * from information_schema.tables
+                        where table_name=%(table)s
+                    );
+            """,
+            {"table": table},
+        )
+
+        return self.cursor.fetchone()[0]
+
+    def create_table(
+        self, table, columns=None, types=None, *, force=False, raise_error=True
+    ):
         """Create new table
 
         Args:
@@ -40,7 +64,13 @@ class Postgres:
         else:
             col_args = ""
 
-        self.drop_table(table)
+        if self.table_exists(table):
+            if force:
+                self.drop_table(table)
+            elif raise_error:
+                raise DuplicateTable(f"{table} already exists")
+            else:
+                return False
 
         self.cursor.execute(
             """
@@ -48,6 +78,8 @@ class Postgres:
             """,
             {"table": AsIs(table), "col_args": AsIs(col_args)},
         )
+
+        return True
 
     def replace_table(self, table, columns, types, values):
         """Replace existing table with new data
@@ -62,7 +94,7 @@ class Postgres:
         temp_table = f"{table}_temp"
         old_table = f"{table}_old"
 
-        self.create_table(temp_table, columns, types)
+        self.create_table(temp_table, columns, types, force=True)
         self.insert(temp_table, columns, values)
 
         self.rename_table(table, old_table)
@@ -70,17 +102,17 @@ class Postgres:
 
         self.drop_table(old_table)
 
-    def drop_table(self, name):
+    def drop_table(self, table):
         """Drop table if it exists
 
         Args:
-            name (str): name of table to drop
+            table (str): table of table to drop
         """
         self.cursor.execute(
             """
                 drop table if exists %(table)s;
             """,
-            {"table": AsIs(name)},
+            {"table": AsIs(table)},
         )
 
     def rename_table(self, name, new_name):
@@ -93,7 +125,7 @@ class Postgres:
         self.cursor.execute(
             """
                 alter table %(name)s
-                    rename to %(new_name)s
+                    rename to %(new_name)s;
             """,
             {"name": AsIs(name), "new_name": AsIs(new_name)},
         )
