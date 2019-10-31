@@ -28,8 +28,8 @@ class Table(NamedTuple):
     update_freq: str = None
 
 
-BP_LEADERBOARD = Table(
-    table="bp_leaderboard",
+BP = Table(
+    table="bp",
     columns=(
         "index",
         "human_index",
@@ -55,6 +55,10 @@ BP_LEADERBOARD = Table(
     update_freq="5m",
 )
 
+BP_MONTHLY = Table(
+    table="bp_monthly", columns=BP.columns, types=BP.types, update_freq="1M"
+)
+
 LAST_UPDATED = Table(
     table="last_updated",
     columns=("name", "updated"),
@@ -74,18 +78,20 @@ def scheduled_update():
         LAST_UPDATED.table, LAST_UPDATED.columns[0], "unique", raise_error=False
     )
 
+    database.create_table(BP.table, BP.columns, BP.types, raise_error=False)
+    database.add_constraint(BP.table, BP.columns[0], "unique", raise_error=False)
+    check_outdated(database, BP)
+
     database.create_table(
-        BP_LEADERBOARD.table,
-        BP_LEADERBOARD.columns,
-        BP_LEADERBOARD.types,
-        raise_error=False,
+        BP_MONTHLY.table, BP_MONTHLY.columns, BP_MONTHLY.types, raise_error=False
     )
     database.add_constraint(
-        BP_LEADERBOARD.table, BP_LEADERBOARD.columns[0], "unique", raise_error=False
+        BP_MONTHLY.table, BP_MONTHLY.columns[0], "unique", raise_error=False
     )
-    check_outdated(database, BP_LEADERBOARD)
+    check_outdated(database, BP_MONTHLY)
 
-    schedule.every().minute.do(check_outdated, database, BP_LEADERBOARD)
+    schedule.every().minute.do(check_outdated, database, BP)
+    schedule.every().minute.do(check_outdated, database, BP_MONTHLY)
 
     while True:
         schedule.run_pending()
@@ -183,7 +189,7 @@ def query_leaderboard(database: Postgres, game, start, length=1):
     """
     database.cursor.execute(
         """
-            select * from %(game)s_leaderboard
+            select * from %(game)s
                 where index >= %(start)s
                 limit %(limit)s;
         """,
