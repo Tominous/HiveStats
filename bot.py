@@ -407,7 +407,7 @@ async def leaderboard(ctx, page=1, game="BP"):
     page -= 1
 
     def create_embed(page, game):
-        data = db_leaderboard.query_leaderboard(database, game, BATCH_SIZE * page, BATCH_SIZE)
+        data = db_leaderboard.query_leaderboard(database, BATCH_SIZE * page, BATCH_SIZE, game)
 
         embed = discord.Embed(title="**{} Leaderboard**".format(game), color=0xFFA500)
         embed.set_author(name=ctx.author, icon_url=ctx.author.avatar_url)

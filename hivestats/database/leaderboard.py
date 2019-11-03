@@ -1,7 +1,9 @@
+from os import path
 import schedule
 import time
 from datetime import datetime, timedelta
 from typing import NamedTuple
+import yaml
 
 from psycopg2.extensions import AsIs
 
@@ -20,50 +22,16 @@ UNIT_DICT = {  # Shortcode mapping for time units
     "w": timedelta(weeks=1),
 }
 
+DIR_PATH = path.dirname(__file__)
+TABLE_FILE = path.join(DIR_PATH, "tables.yaml")
+
 
 class Table(NamedTuple):
     table: str
     columns: tuple
     types: tuple
+    constraints: dict = None
     update_freq: str = None
-
-
-BP = Table(
-    table="bp",
-    columns=(
-        "index",
-        "human_index",
-        "uuid",
-        "wins",
-        "points",
-        "elims",
-        "placings",
-        "played",
-        "username",
-    ),
-    types=(
-        "int",
-        "int",
-        "varchar(32)",
-        "int",
-        "int",
-        "int",
-        "int",
-        "int",
-        "varchar(200)",
-    ),
-    update_freq="5m",
-)
-
-BP_MONTHLY = Table(
-    table="bp_monthly", columns=BP.columns, types=BP.types, update_freq="1M"
-)
-
-LAST_UPDATED = Table(
-    table="last_updated",
-    columns=("name", "updated"),
-    types=("varchar(200)", "timestamp"),
-)
 
 
 def scheduled_update():
@@ -71,31 +39,37 @@ def scheduled_update():
     """
     database = Postgres()
 
-    database.create_table(
-        LAST_UPDATED.table, LAST_UPDATED.columns, LAST_UPDATED.types, raise_error=False
-    )
-    database.add_constraint(
-        LAST_UPDATED.table, LAST_UPDATED.columns[0], "unique", raise_error=False
-    )
+    with open(TABLE_FILE, "r") as file:
+        tables = yaml.safe_load(file)
 
-    database.create_table(BP.table, BP.columns, BP.types, raise_error=False)
-    database.add_constraint(BP.table, BP.columns[0], "unique", raise_error=False)
-    check_outdated(database, BP)
+    global LAST_UPDATED
+    LAST_UPDATED = Table(**tables["last_updated"])
 
-    database.create_table(
-        BP_MONTHLY.table, BP_MONTHLY.columns, BP_MONTHLY.types, raise_error=False
-    )
-    database.add_constraint(
-        BP_MONTHLY.table, BP_MONTHLY.columns[0], "unique", raise_error=False
-    )
-    check_outdated(database, BP_MONTHLY)
-
-    schedule.every().minute.do(check_outdated, database, BP)
-    schedule.every().minute.do(check_outdated, database, BP_MONTHLY)
+    for table in tables.values():
+        setup_table(database, Table(**table))
 
     while True:
         schedule.run_pending()
         time.sleep(1)
+
+
+def setup_table(database: Postgres, table: Table):
+    """Takes a table object and runs all the required steps to create it and setup
+    scheduled updates on the specified database
+
+    Args:
+        database (Postgres): interface to interact with the database
+        table (Table): defines the structure of the table to upload data to
+    """
+    database.create_table(table.table, table.columns, table.types, raise_error=False)
+
+    if table.constraints:
+        for column, constraint in table.constraints.items():
+            database.add_constraint(table.table, column, constraint, raise_error=False)
+
+    if table.update_freq:
+        check_outdated(database, table)
+        schedule.every().minute.do(check_outdated, database, table)
 
 
 def check_outdated(database, data_table):
@@ -103,7 +77,7 @@ def check_outdated(database, data_table):
 
     Args:
         database (Postgres): interface to interact with the database
-        data_table (dict): defines the structure of the table to upload data to
+        data_table (Table): the table that needs to be checked
     """
     now = datetime.utcnow()
     period = data_table.update_freq
@@ -145,7 +119,7 @@ def update_leaderborad(database, data_table, game="bp"):
     Args:
         database (Postgres): interface to interact with the database
         data_table (dict): defines the structure of the table to upload data to
-        game (str): identifier for game
+        game (str, optional): identifier for game, defaults to bp
 
     Requires:
         data_table should define the table name, columns and specific column types if
@@ -170,15 +144,15 @@ def update_leaderborad(database, data_table, game="bp"):
     )
 
 
-def query_leaderboard(database: Postgres, game, start, length=1):
+def query_leaderboard(database: Postgres, start, length=1, game="bp"):
     """Returns leaderboard entries for specified game
 
     Args:
         database (Postgres): interface to interact with the database
-        game (str): identifier for game
         start (int): index for first entry of leaderboard to get
         length (int, optional): number of entries to get from start
                                 defaults to 1
+        game (str, optional): identifier for game, defaults to bp
 
     Requires:
         start is within [0, 1000]
@@ -189,7 +163,7 @@ def query_leaderboard(database: Postgres, game, start, length=1):
     """
     database.cursor.execute(
         """
-            select * from %(game)s
+            select * from %(game)s_main
                 where index >= %(start)s
                 limit %(limit)s;
         """,

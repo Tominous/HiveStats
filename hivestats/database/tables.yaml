@@ -1,0 +1,116 @@
+# used for storing timestamps of when tables were last updaeted
+last_updated:
+  table: last_updated
+  columns:
+    - name
+    - updated
+  types:
+    - varchar(200)
+    - timestamp
+  constraints:
+    name: unique
+
+# All BlockParty tables
+bp_main:
+  table: bp_main
+  columns:
+    - index
+    - human_index
+    - uuid
+    - wins
+    - points
+    - elims
+    - placings
+    - played
+    - username
+  types:
+    - int
+    - int
+    - varchar(32)
+    - int
+    - int
+    - int
+    - int
+    - int
+    - varchar(200)
+  constraints:
+    index: unique
+  update_freq: 5m
+
+bp_daily:
+  table: bp_daily
+  columns:
+    - index
+    - human_index
+    - uuid
+    - wins
+    - points
+    - elims
+    - placings
+    - played
+    - username
+  types:
+    - int
+    - int
+    - varchar(32)
+    - int
+    - int
+    - int
+    - int
+    - int
+    - varchar(200)
+  constraints:
+    index: unique
+  update_freq: 1d
+
+bp_weekly:
+  table: bp_weekly
+  columns:
+    - index
+    - human_index
+    - uuid
+    - wins
+    - points
+    - elims
+    - placings
+    - played
+    - username
+  types:
+    - int
+    - int
+    - varchar(32)
+    - int
+    - int
+    - int
+    - int
+    - int
+    - varchar(200)
+  constraints:
+    index: unique
+  update_freq: 7d
+
+bp_monthly:
+  table: bp_monthly
+  columns:
+    - index
+    - human_index
+    - uuid
+    - wins
+    - points
+    - elims
+    - placings
+    - played
+    - username
+  types:
+    - int
+    - int
+    - varchar(32)
+    - int
+    - int
+    - int
+    - int
+    - int
+    - varchar(200)
+  constraints:
+    index: unique
+  update_freq: 1M
