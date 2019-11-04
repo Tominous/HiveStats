@@ -144,7 +144,9 @@ def update_leaderborad(database, data_table, game="bp"):
     )
 
 
-def query_leaderboard(database: Postgres, start, length=1, game="bp"):
+def query_leaderboard(
+    database: Postgres, start, length=1, sort_by="points", sort_order="desc", game="bp"
+):
     """Returns leaderboard entries for specified game
 
     Args:
@@ -152,6 +154,8 @@ def query_leaderboard(database: Postgres, start, length=1, game="bp"):
         start (int): index for first entry of leaderboard to get
         length (int, optional): number of entries to get from start
                                 defaults to 1
+        sort_by (str, optional): column to sort results by, defaults to points
+        sort_order (str, optional): whether to sort asc or desc, defaults to desc
         game (str, optional): identifier for game, defaults to bp
 
     Requires:
@@ -163,11 +167,21 @@ def query_leaderboard(database: Postgres, start, length=1, game="bp"):
     """
     database.cursor.execute(
         """
-            select * from %(game)s_main
-                where index >= %(start)s
+            select * from (
+                select row_number() over (order by %(sort_by)s %(sort_order)s) as row_num,
+                       *
+                from %(game)s_main
+            ) sorted
+                where row_num >= %(start)s
                 limit %(limit)s;
         """,
-        {"game": AsIs(game), "start": AsIs(start), "limit": AsIs(length)},
+        {
+            "game": AsIs(game),
+            "start": AsIs(start),
+            "limit": AsIs(length),
+            "sort_by": AsIs(sort_by),
+            "sort_order": AsIs(sort_order),
+        },
     )
 
     return database.cursor.fetchall()
