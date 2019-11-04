@@ -53,6 +53,13 @@ class Postgres:
             name (str): name to give table
             columns (Tuple[str], optional): column names
             types (Tuple[str], optional): type enforcement for columns
+            force (bool, optional): this determines whether to forcibly replace delete
+                                    and replace table if it already exists
+                                    defaults to False
+            raise_error (bool, optional): if table exists and force is false, an error
+                                          is thrown; if raise_error is false, this
+                                          function will fail silently
+                                          defaults to True
         """
         if columns:
             if not types:
@@ -137,6 +144,12 @@ class Postgres:
             table (str): name of table to insert values into
             columns (Tuple[str]): tuple of columns to insert values into
             values (Tuple(Tuple(Any))): values to be inserted into new table
+            conflict_key (str, optional): name of a column to resolve row conflicts on
+                                          if provided, an upsert is performed and this
+                                          column is used to determine and update rows
+
+        Note:
+            if provided, the column used as conflict_key must be constrained as unique
         """
         conflict_clause = ""
 
@@ -171,6 +184,10 @@ class Postgres:
             constraint (str): the type of constraint to add
             constraint_name (str, optional): specific name for constraint, set to
                                              {table}_{column}_{constraint} by default
+            raise_error (bool, optional): if constraint exists, an error is thrown; if
+                                          raise_error is false, this function will fail
+                                          silently
+                                          defaults to True
         """
         if not constraint_name:
             constraint_name = f"{table}_{column}_{constraint}"
