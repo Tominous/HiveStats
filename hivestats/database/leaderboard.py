@@ -27,7 +27,7 @@ TABLE_FILE = path.join(DIR_PATH, "tables.yaml")
 
 
 class Table(NamedTuple):
-    table: str
+    name: str
     columns: tuple
     types: tuple
     constraints: dict = None
@@ -61,11 +61,11 @@ def setup_table(database: Postgres, table: Table):
         database (Postgres): interface to interact with the database
         table (Table): defines the structure of the table to upload data to
     """
-    database.create_table(table.table, table.columns, table.types, raise_error=False)
+    database.create_table(table.name, table.columns, table.types, raise_error=False)
 
     if table.constraints:
         for column, constraint in table.constraints.items():
-            database.add_constraint(table.table, column, constraint, raise_error=False)
+            database.add_constraint(table.name, column, constraint, raise_error=False)
 
     if table.update_freq:
         check_outdated(database, table)
@@ -89,10 +89,10 @@ def check_outdated(database, data_table):
                 where %(name_col)s = %(target)s
         """,
         {
-            "update_table": AsIs(LAST_UPDATED.table),
+            "update_table": AsIs(LAST_UPDATED.name),
             "name_col": AsIs(LAST_UPDATED.columns[0]),
             "update_col": AsIs(LAST_UPDATED.columns[1]),
-            "target": data_table.table,
+            "target": data_table.name,
         },
     )
 
@@ -133,13 +133,13 @@ def update_leaderborad(database, data_table, game="bp"):
     data = tuple(tuple(row.values()) for row in data)
 
     database.insert(
-        data_table.table, data_table.columns, data, conflict_key=data_table.columns[0]
+        data_table.name, data_table.columns, data, conflict_key=data_table.columns[0]
     )
 
     database.insert(
-        LAST_UPDATED.table,
+        LAST_UPDATED.name,
         LAST_UPDATED.columns,
-        ((data_table.table, SQL_NOW),),
+        ((data_table.name, SQL_NOW),),
         conflict_key=LAST_UPDATED.columns[0],
     )
 

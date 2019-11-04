@@ -23,11 +23,11 @@ class Postgres:
     def __exit__(self, exc_type, exc_value, traceback):
         self._conn.close()
 
-    def table_exists(self, table):
+    def table_exists(self, name):
         """Check if a table exists
 
         Args:
-            table (str): name of table to checks
+            name (str): name of table to checks
 
         Returns:
             bool: whether table exists
@@ -36,21 +36,21 @@ class Postgres:
             """
                 select exists(
                     select * from information_schema.tables
-                        where table_name=%(table)s
+                        where table_name=%(name)s
                     );
             """,
-            {"table": table},
+            {"name": name},
         )
 
         return self.cursor.fetchone()[0]
 
     def create_table(
-        self, table, columns=None, types=None, *, force=False, raise_error=True
+        self, name, columns=None, types=None, *, force=False, raise_error=True
     ):
         """Create new table
 
         Args:
-            table (str): name to give table
+            name (str): name to give table
             columns (Tuple[str], optional): column names
             types (Tuple[str], optional): type enforcement for columns
         """
@@ -64,24 +64,24 @@ class Postgres:
         else:
             col_args = ""
 
-        if self.table_exists(table):
+        if self.table_exists(name):
             if force:
-                self.drop_table(table)
+                self.drop_table(name)
             elif raise_error:
-                raise DuplicateTable(f"{table} already exists")
+                raise DuplicateTable(f"{name} already exists")
             else:
                 return False
 
         self.cursor.execute(
             """
-                create table %(table)s (%(col_args)s);
+                create table %(name)s (%(col_args)s);
             """,
-            {"table": AsIs(table), "col_args": AsIs(col_args)},
+            {"name": AsIs(name), "col_args": AsIs(col_args)},
         )
 
         return True
 
-    def replace_table(self, table, columns, types, values):
+    def replace_table(self, name, columns, types, values):
         """Replace existing table with new data
 
         Args:
@@ -91,28 +91,28 @@ class Postgres:
             values (Tuple(Tuple(Any))): values to be inserted into new table
         """
 
-        temp_table = f"{table}_temp"
-        old_table = f"{table}_old"
+        temp_table = f"{name}_temp"
+        old_table = f"{name}_old"
 
         self.create_table(temp_table, columns, types, force=True)
         self.insert(temp_table, columns, values)
 
-        self.rename_table(table, old_table)
-        self.rename_table(temp_table, table)
+        self.rename_table(name, old_table)
+        self.rename_table(temp_table, name)
 
         self.drop_table(old_table)
 
-    def drop_table(self, table):
+    def drop_table(self, name):
         """Drop table if it exists
 
         Args:
-            table (str): table of table to drop
+            name (str): table of table to drop
         """
         self.cursor.execute(
             """
                 drop table if exists %(table)s;
             """,
-            {"table": AsIs(table)},
+            {"name": AsIs(name)},
         )
 
     def rename_table(self, name, new_name):

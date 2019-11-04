@@ -1,6 +1,6 @@
 # used for storing timestamps of when tables were last updaeted
 last_updated:
-  table: last_updated
+  name: last_updated
   columns:
     - name
     - updated
@@ -12,7 +12,7 @@ last_updated:
 
 # All BlockParty tables
 bp_main:
-  table: bp_main
+  name: bp_main
   columns:
     - index
     - human_index
@@ -38,7 +38,7 @@ bp_main:
   update_freq: 5m
 
 bp_daily:
-  table: bp_daily
+  name: bp_daily
   columns:
     - index
     - human_index
@@ -64,7 +64,7 @@ bp_daily:
   update_freq: 1d
 
 bp_weekly:
-  table: bp_weekly
+  name: bp_weekly
   columns:
     - index
     - human_index
@@ -90,7 +90,7 @@ bp_weekly:
   update_freq: 7d
 
 bp_monthly:
-  table: bp_monthly
+  name: bp_monthly
   columns:
     - index
     - human_index
