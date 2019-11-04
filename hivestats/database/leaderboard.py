@@ -172,7 +172,7 @@ def query_leaderboard(
                        *
                 from %(game)s_main
             ) sorted
-                where row_num >= %(start)s
+                where row_num > %(start)s
                 limit %(limit)s;
         """,
         {
