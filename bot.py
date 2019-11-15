@@ -461,7 +461,9 @@ async def leaderboard(ctx, page=1, game="BP"):
 
     async def run_checks(page):
         try:
-            payload = await client.wait_for("raw_reaction_add", timeout=REACTION_POLLING_FREQ)
+            payload = await client.wait_for(
+                "raw_reaction_add", timeout=REACTION_POLLING_FREQ
+            )
         except TimeoutError:
             pass
         else:
@@ -500,6 +502,6 @@ async def leaderboard(ctx, page=1, game="BP"):
     await run_checks(page)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     Process(target=run_bot).start()
     Process(target=update_leaderboard).start()
