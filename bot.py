@@ -11,7 +11,7 @@ from mojang_api import get_uuid, is_valid_uuid, get_username_history
 from hivestats import hive_api as hive
 from hivestats.content_functions import get_next_rank
 from hivestats.database import Postgres
-import hivestats.database.leaderboard as db_leaderboard
+import hivestats.database.leaderboard as db_lb
 
 
 BOT_PREFIX = os.environ["BOT_PREFIX"]
@@ -23,6 +23,14 @@ LEADERBOARD_LENGTH = 1000  # Number of players on the Hive leaderboard
 
 REACTION_TIMEOUT = 600  # Timeout for reaction based interfaces
 REACTION_POLLING_FREQ = 60  # Frequency at which reaction checks auto-timeout
+
+BP_STATS_KEYS = [
+    "victories",
+    "total_points",
+    "total_eliminations",
+    "total_placing",
+    "games_played",
+]
 
 REACTIONS = {
     "rewind": "\u23EA",
@@ -44,7 +52,7 @@ def run_bot():
 def update_leaderboard():
     """Packaged function for multiprocessing, starts leaderboard caching
     """
-    db_leaderboard.scheduled_update()
+    db_lb.scheduled_update()
 
 
 @client.event
@@ -205,7 +213,7 @@ async def seen(ctx, username):
 
 
 @client.command(name="stats", aliases=["records", "stat"])
-async def get_stats(ctx, uuid=None, game="BP"):
+async def get_stats(ctx, uuid=None, period="all", game="BP"):
     valid, resolved = resolve_username(uuid)
 
     if not valid:
@@ -227,22 +235,38 @@ async def get_stats(ctx, uuid=None, game="BP"):
             name="BlockParty Stats", value="This player has never played BlockParty."
         )
     else:
-        win_loss = (
-            "Infinity"
-            if stats["games_played"] == stats["victories"]
-            else "{:.2f}".format(
-                stats["victories"] / (stats["games_played"] - stats["victories"])
-            )
-        )
-        win_rate = "{:.2%}".format(stats["victories"] / stats["games_played"])
+        if period != "all":
+            cached_stats = db_lb.query_stats(database, uuid, game, period)
+
+            if not cached_stats:
+                await ctx.send(
+                    f"This player does not have any cached stats available for this period."
+                )
+                return
+
+            for key in BP_STATS_KEYS:
+                stats[key] = stats[key] - cached_stats[key]
+
+        if stats["games_played"] == 0:
+            win_loss, win_rate = "Undefined", "Undefined"
+        else:
+            if stats["games_played"] == stats["victories"]:
+                win_loss = "Infinity"
+            else:
+                win_loss = "{:.2f}".format(
+                    stats["victories"] / (stats["games_played"] - stats["victories"])
+                )
+
+            win_rate = "{:.2%}".format(stats["victories"] / stats["games_played"])
 
         next_rank, diff = get_next_rank(stats["total_points"])
+        next_rank_text = f"({diff} points to {next_rank})" if period == "all" else ""
 
         if game == "BP":
             embed.add_field(
                 name="BlockParty Stats",
                 value=(
-                    f"**Rank:** {stats['title']} ({diff} points to {next_rank})\n"
+                    f"**Rank:** {stats['title']} {next_rank_text}\n"
                     f"**Points:** {stats['total_points']}\n"
                     f"**Games Played:** {stats['games_played']}\n"
                     f"**Wins:** {stats['victories']}\n"
@@ -407,7 +431,7 @@ async def leaderboard(ctx, page=1, game="BP"):
     page -= 1
 
     def create_embed(page, game):
-        data = db_leaderboard.query_leaderboard(database, BATCH_SIZE * page, BATCH_SIZE)
+        data = db_lb.query_leaderboard(database, BATCH_SIZE * page, BATCH_SIZE)
 
         embed = discord.Embed(title="**{} Leaderboard**".format(game), color=0xFFA500)
         embed.set_author(name=ctx.author, icon_url=ctx.author.avatar_url)
@@ -424,7 +448,7 @@ async def leaderboard(ctx, page=1, game="BP"):
 
         embed.add_field(
             name="Points",
-            value="\n".join([f"{entry['points']:,}" for entry in data]),
+            value="\n".join([f"{entry['total_points']:,}" for entry in data]),
         )
         return embed
 

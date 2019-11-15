@@ -145,7 +145,13 @@ def update_leaderborad(database, data_table, game="bp"):
 
 
 def query_leaderboard(
-    database: Postgres, start, length=1, sort_by="points", sort_order="desc", game="bp"
+    database: Postgres,
+    start,
+    length=1,
+    sort_by="total_points",
+    sort_order="desc",
+    game="bp",
+    period="all",
 ):
     """Returns leaderboard entries for specified game
 
@@ -157,6 +163,8 @@ def query_leaderboard(
         sort_by (str, optional): column to sort results by, defaults to points
         sort_order (str, optional): whether to sort asc or desc, defaults to desc
         game (str, optional): identifier for game, defaults to bp
+        period (str, optional): used to determine the correct table to query from,
+                                defaults to all time
 
     Requires:
         start is within [0, 1000]
@@ -170,13 +178,14 @@ def query_leaderboard(
             select * from (
                 select row_number() over (order by %(sort_by)s %(sort_order)s) as row_num,
                        *
-                from %(game)s_main
+                from %(game)s_%(period)s
             ) sorted
                 where row_num > %(start)s
                 limit %(limit)s;
         """,
         {
             "game": AsIs(game),
+            "period": AsIs(period),
             "start": AsIs(start),
             "limit": AsIs(length),
             "sort_by": AsIs(sort_by),
@@ -185,3 +194,24 @@ def query_leaderboard(
     )
 
     return database.cursor.fetchall()
+
+
+def query_stats(database: Postgres, uuid, game="bp", period="all"):
+    """Returns stats for a player from the appropriate table
+
+    Args:
+        databse (Postgres): interface to interact with the database
+        uuid (str): id of player to retrieve data for
+        game (str, optional): identifier for game, defaults to bp
+        period (str, optional): used to determine the correct table to query from,
+                                defaults to all time
+    """
+    database.cursor.execute(
+        """
+            select * from %(game)s_%(period)s
+                where uuid = %(uuid)s;
+        """,
+        {"game": AsIs(game), "period": AsIs(period), "uuid": uuid},
+    )
+
+    return database.cursor.fetchone()
