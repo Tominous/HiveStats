@@ -423,7 +423,7 @@ async def compare(ctx, uuid_a=None, uuid_b=None, game="BP"):
 
 
 @client.command(name="leaderboard", aliases=["leaderboards", "lb"])
-async def leaderboard(ctx, page=1, game="BP"):
+async def leaderboard(ctx, period="all", page=1, game="BP"):
     if page < 1 or page > 50:
         await ctx.send("Please input a page number between 1-50.")
         return
@@ -431,7 +431,7 @@ async def leaderboard(ctx, page=1, game="BP"):
     page -= 1
 
     def create_embed(page, game):
-        data = db_lb.query_leaderboard(database, BATCH_SIZE * page, BATCH_SIZE)
+        data = db_lb.query_leaderboard(database, BATCH_SIZE * page, BATCH_SIZE, period=period)
 
         embed = discord.Embed(title="**{} Leaderboard**".format(game), color=0xFFA500)
         embed.set_author(name=ctx.author, icon_url=ctx.author.avatar_url)
@@ -440,7 +440,7 @@ async def leaderboard(ctx, page=1, game="BP"):
             name="#    Player",
             value="\n".join(
                 [
-                    f"{entry['human_index']}) **{format_username(entry['username'])}**"
+                    f"{entry['row_num']}) **{format_username(entry['username'])}**"
                     for entry in data
                 ]
             ),
