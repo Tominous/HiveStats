@@ -429,7 +429,9 @@ async def leaderboard(ctx, page=1, game="BP"):
         return embed
 
     msg = await ctx.send(embed=create_embed(page, game))
-
+    print(msg.channel.type)
+    if str(msg.channel.type) != "text":
+        await ctx.send('Warning: The emojis are not auto removed in DMs.')
     await msg.add_reaction(REACTIONS["rewind"])
     await msg.add_reaction(REACTIONS["left_arrow"])
     await msg.add_reaction(REACTIONS["right_arrow"])
@@ -454,7 +456,9 @@ async def leaderboard(ctx, page=1, game="BP"):
                     REACTIONS["fast_forward"],
                 )
             ):
-                await msg.remove_reaction(emoji, ctx.author)
+                
+                if str(msg.channel.type) == "text":
+                    await msg.remove_reaction(emoji, ctx.author)
 
                 if emoji == REACTIONS["rewind"]:
                     page -= 10
