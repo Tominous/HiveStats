@@ -37,6 +37,10 @@ REACTIONS = {
     "left_arrow": "\u25C0",
     "right_arrow": "\u25B6",
     "fast_forward": "\u23E9",
+    "letter_d": u"\U0001F1E9",
+    "letter_w": u"\U0001F1FC",
+    "letter_m": u"\U0001F1F2",
+    "letter_a": u"\U0001F1E6",
 }
 
 client = Bot(command_prefix=BOT_PREFIX, case_insensitive=True)
@@ -226,59 +230,114 @@ async def get_stats(ctx, uuid=None, period="all", game="BP"):
     if not data:
         await ctx.send("This player has never played on The Hive.")
         return
+    
+    def create_stats_embed(data, uuid, game, period):
+        period = period.lower()
+        game = game.upper()
+        embed = embed_header(data)
+        stats = hive.player_data(uuid, game)
 
-    embed = embed_header(data)
-    stats = hive.player_data(uuid, game)
-
-    if not stats:
-        embed.add_field(
-            name="BlockParty Stats", value="This player has never played BlockParty."
-        )
-    else:
-        if period != "all":
-            cached_stats = db_lb.query_stats(database, uuid, game, period)
-
-            if not cached_stats:
-                await ctx.send(
-                    f"This player does not have any cached stats available for this period."
-                )
-                return
-
-            for key in BP_STATS_KEYS:
-                stats[key] = stats[key] - cached_stats[key]
-
-        if stats["games_played"] == 0:
-            win_loss, win_rate = "Undefined", "Undefined"
-        else:
-            if stats["games_played"] == stats["victories"]:
-                win_loss = "Infinity"
-            else:
-                win_loss = "{:.2f}".format(
-                    stats["victories"] / (stats["games_played"] - stats["victories"])
-                )
-
-            win_rate = "{:.2%}".format(stats["victories"] / stats["games_played"])
-
-        next_rank, diff = get_next_rank(stats["total_points"])
-        next_rank_text = f"({diff} points to {next_rank})" if period == "all" else ""
-
-        if game == "BP":
+        if not stats:
             embed.add_field(
-                name="BlockParty Stats",
-                value=(
-                    f"**Rank:** {stats['title']} {next_rank_text}\n"
-                    f"**Points:** {stats['total_points']}\n"
-                    f"**Games Played:** {stats['games_played']}\n"
-                    f"**Wins:** {stats['victories']}\n"
-                    f"**Placings:** {stats['total_placing']}\n"
-                    f"**Eliminations:** {stats['total_eliminations']}\n"
-                    f"\n"
-                    f"**W/L Ratio:** {win_loss}\n"
-                    f"**Win Rate:** {win_rate}"
-                ),
+                name="BlockParty Stats", value="This player has never played BlockParty."
             )
+        else:
+            if period != "all":
+                cached_stats = db_lb.query_stats(database, uuid, game, period)
+                if not cached_stats:
+                    embed.add_field(
+                        name="BlockParty Stats", value="This player does not have any cached stats available for this period."
+                    )
+                    return embed
 
-    await ctx.send(embed=embed)
+                for key in BP_STATS_KEYS:
+                    stats[key] = stats[key] - cached_stats[key]
+
+            if stats["games_played"] == 0:
+                win_loss, win_rate = "Undefined", "Undefined"
+            else:
+                if stats["games_played"] == stats["victories"]:
+                    win_loss = "Infinity"
+                else:
+                    win_loss = "{:.2f}".format(
+                        stats["victories"] / (stats["games_played"] - stats["victories"])
+                    )
+
+                win_rate = "{:.2%}".format(stats["victories"] / stats["games_played"])
+
+            next_rank, diff = get_next_rank(stats["total_points"])
+            next_rank_text = f"({diff} points to {next_rank})" if period == "all" else ""
+
+            if game == "BP":
+                if period != 'all':
+                    embed_title = f"BlockParty {period.capitalize()} Stats"
+                else:
+                    embed_title="BlockParty Stats"
+                embed.add_field(
+                    name=embed_title,
+                    value=(
+                        f"**Rank:** {stats['title']} {next_rank_text}\n"
+                        f"**Points:** {stats['total_points']}\n"
+                        f"**Games Played:** {stats['games_played']}\n"
+                        f"**Wins:** {stats['victories']}\n"
+                        f"**Placings:** {stats['total_placing']}\n"
+                        f"**Eliminations:** {stats['total_eliminations']}\n"
+                        f"\n"
+                        f"**W/L Ratio:** {win_loss}\n"
+                        f"**Win Rate:** {win_rate}"
+                    ),
+                )
+
+        return embed
+
+    msg = await ctx.send(embed=create_stats_embed(data,uuid,game,period))
+    if str(ctx.channel.type) != "text":
+        await ctx.send('Warning: The emojis are not auto removed in DMs.')
+    await msg.add_reaction(REACTIONS["letter_d"])
+    await msg.add_reaction(REACTIONS["letter_w"])
+    await msg.add_reaction(REACTIONS["letter_m"])
+    await msg.add_reaction(REACTIONS["letter_a"])
+    async def stats_reaction_check():
+        try:
+            payload = await client.wait_for(
+                "raw_reaction_add", timeout=REACTION_POLLING_FREQ
+            )
+        except TimeoutError:
+            pass
+        else:
+            emoji = str(payload.emoji.name)
+
+            if (
+                payload.message_id == msg.id
+                and payload.user_id == ctx.author.id
+                and emoji
+                in (
+                    REACTIONS["letter_d"],
+                    REACTIONS["letter_w"],
+                    REACTIONS["letter_m"],
+                    REACTIONS["letter_a"],
+                )
+            ):
+                if str(ctx.channel.type) == "text":
+                    await msg.remove_reaction(emoji, ctx.author)
+
+                if emoji == REACTIONS["letter_d"]:
+                    stats_type='daily'
+                elif emoji == REACTIONS["letter_w"]:
+                    stats_type='weekly'
+                elif emoji == REACTIONS["letter_m"]:
+                    stats_type='monthly'
+                elif emoji == REACTIONS["letter_a"]:
+                    stats_type='all'
+
+                await msg.edit(embed=create_stats_embed(data,uuid,game,stats_type))
+
+        if (datetime.utcnow() - msg.created_at).total_seconds() < REACTION_TIMEOUT:
+            await stats_reaction_check()
+        else:
+            await msg.clear_reactions()
+
+    await stats_reaction_check()
 
 
 @client.command(name="names", aliases=["history", "namemc"])
