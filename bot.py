@@ -32,17 +32,6 @@ BP_STATS_KEYS = [
     "games_played",
 ]
 
-REACTIONS = {
-    "rewind": "\u23EA",
-    "left_arrow": "\u25C0",
-    "right_arrow": "\u25B6",
-    "fast_forward": "\u23E9",
-    "letter_d": u"\U0001F1E9",
-    "letter_w": u"\U0001F1FC",
-    "letter_m": u"\U0001F1F2",
-    "letter_a": u"\U0001F1E6",
-}
-
 client = Bot(command_prefix=BOT_PREFIX, case_insensitive=True)
 database = Postgres()
 
@@ -230,7 +219,14 @@ async def get_stats(ctx, uuid=None, period="all", game="BP"):
     if not data:
         await ctx.send("This player has never played on The Hive.")
         return
-    
+
+    reactions = {
+        "\U0001F1E9": "daily",
+        "\U0001F1FC": "weekly",
+        "\U0001F1F2": "monthly",
+        "\U0001F1E6": "all",
+    }
+
     def create_stats_embed(data, uuid, game, period):
         period = period.lower()
         game = game.upper()
@@ -239,14 +235,16 @@ async def get_stats(ctx, uuid=None, period="all", game="BP"):
 
         if not stats:
             embed.add_field(
-                name="BlockParty Stats", value="This player has never played BlockParty."
+                name="BlockParty Stats",
+                value="This player has never played BlockParty.",
             )
         else:
             if period != "all":
                 cached_stats = db_lb.query_stats(database, uuid, game, period)
                 if not cached_stats:
                     embed.add_field(
-                        name="BlockParty Stats", value="This player does not have any cached stats available for this period."
+                        name="BlockParty Stats",
+                        value="This player does not have any cached stats available for this period.",
                     )
                     return embed
 
@@ -260,19 +258,22 @@ async def get_stats(ctx, uuid=None, period="all", game="BP"):
                     win_loss = "Infinity"
                 else:
                     win_loss = "{:.2f}".format(
-                        stats["victories"] / (stats["games_played"] - stats["victories"])
+                        stats["victories"]
+                        / (stats["games_played"] - stats["victories"])
                     )
 
                 win_rate = "{:.2%}".format(stats["victories"] / stats["games_played"])
 
             next_rank, diff = get_next_rank(stats["total_points"])
-            next_rank_text = f"({diff} points to {next_rank})" if period == "all" else ""
+            next_rank_text = (
+                f"({diff} points to {next_rank})" if period == "all" else ""
+            )
 
             if game == "BP":
-                if period != 'all':
+                if period != "all":
                     embed_title = f"BlockParty {period.capitalize()} Stats"
                 else:
-                    embed_title="BlockParty Stats"
+                    embed_title = "BlockParty Stats"
                 embed.add_field(
                     name=embed_title,
                     value=(
@@ -290,13 +291,14 @@ async def get_stats(ctx, uuid=None, period="all", game="BP"):
 
         return embed
 
-    msg = await ctx.send(embed=create_stats_embed(data,uuid,game,period))
+    msg = await ctx.send(embed=create_stats_embed(data, uuid, game, period))
+
     if str(ctx.channel.type) != "text":
-        await ctx.send('Warning: The emojis are not auto removed in DMs.')
-    await msg.add_reaction(REACTIONS["letter_d"])
-    await msg.add_reaction(REACTIONS["letter_w"])
-    await msg.add_reaction(REACTIONS["letter_m"])
-    await msg.add_reaction(REACTIONS["letter_a"])
+        await ctx.send("Warning: The emojis are not auto removed in DMs.")
+
+    for reaction in reactions:
+        await msg.add_reaction(reaction)
+
     async def stats_reaction_check():
         try:
             payload = await client.wait_for(
@@ -310,34 +312,18 @@ async def get_stats(ctx, uuid=None, period="all", game="BP"):
             if (
                 payload.message_id == msg.id
                 and payload.user_id == ctx.author.id
-                and emoji
-                in (
-                    REACTIONS["letter_d"],
-                    REACTIONS["letter_w"],
-                    REACTIONS["letter_m"],
-                    REACTIONS["letter_a"],
-                )
+                and emoji in reactions
             ):
+                stats_type = reactions[emoji]
+                await msg.edit(embed=create_stats_embed(data, uuid, game, stats_type))
+
                 if str(ctx.channel.type) == "text":
                     await msg.remove_reaction(emoji, ctx.author)
 
-                if emoji == REACTIONS["letter_d"]:
-                    stats_type='daily'
-                elif emoji == REACTIONS["letter_w"]:
-                    stats_type='weekly'
-                elif emoji == REACTIONS["letter_m"]:
-                    stats_type='monthly'
-                elif emoji == REACTIONS["letter_a"]:
-                    stats_type='all'
+    while (datetime.utcnow() - msg.created_at).total_seconds() < REACTION_TIMEOUT:
+        await stats_reaction_check()
 
-                await msg.edit(embed=create_stats_embed(data,uuid,game,stats_type))
-
-        if (datetime.utcnow() - msg.created_at).total_seconds() < REACTION_TIMEOUT:
-            await stats_reaction_check()
-        else:
-            await msg.clear_reactions()
-
-    await stats_reaction_check()
+    await msg.clear_reaction()
 
 
 @client.command(name="names", aliases=["history", "namemc"])
@@ -488,9 +474,17 @@ async def leaderboard(ctx, period="all", page=1, game="BP"):
         return
 
     page -= 1
+    reactions = {
+        "\u23EA": -10,  # rewind
+        "\u25C0": -1,  # left_arrow
+        "\u25B6": 1,  # right_arrow
+        "\u23E9": 10,  # fast_forward
+    }
 
     def create_embed(page, game):
-        data = db_lb.query_leaderboard(database, BATCH_SIZE * page, BATCH_SIZE, period=period)
+        data = db_lb.query_leaderboard(
+            database, BATCH_SIZE * page, BATCH_SIZE, period=period
+        )
 
         embed = discord.Embed(title="**{} Leaderboard**".format(game), color=0xFFA500)
         embed.set_author(name=ctx.author, icon_url=ctx.author.avatar_url)
@@ -513,10 +507,8 @@ async def leaderboard(ctx, period="all", page=1, game="BP"):
 
     msg = await ctx.send(embed=create_embed(page, game))
 
-    await msg.add_reaction(REACTIONS["rewind"])
-    await msg.add_reaction(REACTIONS["left_arrow"])
-    await msg.add_reaction(REACTIONS["right_arrow"])
-    await msg.add_reaction(REACTIONS["fast_forward"])
+    for reaction in reactions:
+        await msg.add_reaction(reaction)
 
     async def run_checks(page):
         try:
@@ -531,35 +523,20 @@ async def leaderboard(ctx, period="all", page=1, game="BP"):
             if (
                 payload.message_id == msg.id
                 and payload.user_id == ctx.author.id
-                and emoji
-                in (
-                    REACTIONS["rewind"],
-                    REACTIONS["left_arrow"],
-                    REACTIONS["right_arrow"],
-                    REACTIONS["fast_forward"],
-                )
+                and emoji in reactions
             ):
-                await msg.remove_reaction(emoji, ctx.author)
+                
+                if str(msg.channel.type) == "text":
+                    await msg.remove_reaction(emoji, ctx.author)
 
-                if emoji == REACTIONS["rewind"]:
-                    page -= 10
-                elif emoji == REACTIONS["left_arrow"]:
-                    page -= 1
-                elif emoji == REACTIONS["right_arrow"]:
-                    page += 1
-                elif emoji == REACTIONS["fast_forward"]:
-                    page += 10
-
+                page += reactions[emoji]
                 page %= int(LEADERBOARD_LENGTH / BATCH_SIZE)
                 await msg.edit(embed=create_embed(page, game))
 
-        if (datetime.utcnow() - msg.created_at).total_seconds() < REACTION_TIMEOUT:
-            await run_checks(page)
-        else:
-            await msg.clear_reactions()
+    while (datetime.utcnow() - msg.created_at).total_seconds() < REACTION_TIMEOUT:
+        await run_checks(page)
 
-    await run_checks(page)
-
+    await msg.clear_reactions()
 
 if __name__ == "__main__":
     Process(target=run_bot).start()
