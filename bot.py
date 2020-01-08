@@ -228,8 +228,9 @@ async def get_stats(ctx, uuid=None, period="all", game="BP"):
     }
 
     def create_stats_embed(data, uuid, game, period):
-        period = period.lower()
         game = game.upper()
+        period = period.lower()
+
         embed = embed_header(data)
         stats = hive.player_data(uuid, game)
 
@@ -481,7 +482,10 @@ async def leaderboard(ctx, period="all", page=1, game="BP"):
         "\u23E9": 10,  # fast_forward
     }
 
-    def create_embed(page, game):
+    def create_embed(page, game, period):
+        game = game.upper()
+        period = period.lower()
+
         data = db_lb.query_leaderboard(
             database, BATCH_SIZE * page, BATCH_SIZE, period=period
         )
@@ -505,7 +509,7 @@ async def leaderboard(ctx, period="all", page=1, game="BP"):
         )
         return embed
 
-    msg = await ctx.send(embed=create_embed(page, game))
+    msg = await ctx.send(embed=create_embed(page, game, period))
 
     for reaction in reactions:
         await msg.add_reaction(reaction)
@@ -525,7 +529,7 @@ async def leaderboard(ctx, period="all", page=1, game="BP"):
                 and payload.user_id == ctx.author.id
                 and emoji in reactions
             ):
-                
+
                 if str(msg.channel.type) == "text":
                     await msg.remove_reaction(emoji, ctx.author)
 
@@ -537,6 +541,7 @@ async def leaderboard(ctx, period="all", page=1, game="BP"):
         await run_checks(page)
 
     await msg.clear_reactions()
+
 
 if __name__ == "__main__":
     Process(target=run_bot).start()
