@@ -514,6 +514,9 @@ async def leaderboard(ctx, period="all", page=1, game="BP"):
     for reaction in reactions:
         await msg.add_reaction(reaction)
 
+    if str(msg.channel.type) != "text":
+        await ctx.send('Warning: The emojis are not auto removed in DMs.')
+
     async def run_checks(page):
         try:
             payload = await client.wait_for(
@@ -529,7 +532,6 @@ async def leaderboard(ctx, period="all", page=1, game="BP"):
                 and payload.user_id == ctx.author.id
                 and emoji in reactions
             ):
-
                 if str(msg.channel.type) == "text":
                     await msg.remove_reaction(emoji, ctx.author)
 
