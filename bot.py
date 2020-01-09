@@ -537,10 +537,12 @@ async def leaderboard(ctx, period="all", page=1, game="BP"):
 
                 page += reactions[emoji]
                 page %= int(LEADERBOARD_LENGTH / BATCH_SIZE)
-                await msg.edit(embed=create_embed(page, game))
+                await msg.edit(embed=create_embed(page, game, period))
+
+        return page
 
     while (datetime.utcnow() - msg.created_at).total_seconds() < REACTION_TIMEOUT:
-        await run_checks(page)
+        page = await run_checks(page)
 
     await msg.clear_reactions()
 
