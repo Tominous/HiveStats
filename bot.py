@@ -11,7 +11,7 @@ from mojang_api import get_uuid, is_valid_uuid, get_username_history
 from hivestats import hive_api as hive
 from hivestats.content_functions import get_next_rank
 from hivestats.database import Postgres
-import hivestats.database.leaderboard as db_leaderboard
+import hivestats.database.leaderboard as db_lb
 
 
 BOT_PREFIX = os.environ["BOT_PREFIX"]
@@ -24,12 +24,13 @@ LEADERBOARD_LENGTH = 1000  # Number of players on the Hive leaderboard
 REACTION_TIMEOUT = 600  # Timeout for reaction based interfaces
 REACTION_POLLING_FREQ = 60  # Frequency at which reaction checks auto-timeout
 
-REACTIONS = {
-    "rewind": "\u23EA",
-    "left_arrow": "\u25C0",
-    "right_arrow": "\u25B6",
-    "fast_forward": "\u23E9",
-}
+BP_STATS_KEYS = [
+    "victories",
+    "total_points",
+    "total_eliminations",
+    "total_placing",
+    "games_played",
+]
 
 client = Bot(command_prefix=BOT_PREFIX, case_insensitive=True)
 database = Postgres()
@@ -44,7 +45,7 @@ def run_bot():
 def update_leaderboard():
     """Packaged function for multiprocessing, starts leaderboard caching
     """
-    db_leaderboard.scheduled_update()
+    db_lb.scheduled_update()
 
 
 @client.event
@@ -205,7 +206,7 @@ async def seen(ctx, username):
 
 
 @client.command(name="stats", aliases=["records", "stat"])
-async def get_stats(ctx, uuid=None, game="BP"):
+async def get_stats(ctx, uuid=None, period="all", game="BP"):
     valid, resolved = resolve_username(uuid)
 
     if not valid:
@@ -219,42 +220,111 @@ async def get_stats(ctx, uuid=None, game="BP"):
         await ctx.send("This player has never played on The Hive.")
         return
 
-    embed = embed_header(data)
-    stats = hive.player_data(uuid, game)
+    reactions = {
+        "\U0001F1E9": "daily",
+        "\U0001F1FC": "weekly",
+        "\U0001F1F2": "monthly",
+        "\U0001F1E6": "all",
+    }
 
-    if not stats:
-        embed.add_field(
-            name="BlockParty Stats", value="This player has never played BlockParty."
-        )
-    else:
-        win_loss = (
-            "Infinity"
-            if stats["games_played"] == stats["victories"]
-            else "{:.2f}".format(
-                stats["victories"] / (stats["games_played"] - stats["victories"])
-            )
-        )
-        win_rate = "{:.2%}".format(stats["victories"] / stats["games_played"])
+    def create_stats_embed(data, uuid, game, period):
+        game = game.upper()
+        period = period.lower()
 
-        next_rank, diff = get_next_rank(stats["total_points"])
+        embed = embed_header(data)
+        stats = hive.player_data(uuid, game)
 
-        if game == "BP":
+        if not stats:
             embed.add_field(
                 name="BlockParty Stats",
-                value=(
-                    f"**Rank:** {stats['title']} ({diff} points to {next_rank})\n"
-                    f"**Points:** {stats['total_points']}\n"
-                    f"**Games Played:** {stats['games_played']}\n"
-                    f"**Wins:** {stats['victories']}\n"
-                    f"**Placings:** {stats['total_placing']}\n"
-                    f"**Eliminations:** {stats['total_eliminations']}\n"
-                    f"\n"
-                    f"**W/L Ratio:** {win_loss}\n"
-                    f"**Win Rate:** {win_rate}"
-                ),
+                value="This player has never played BlockParty.",
+            )
+        else:
+            if period != "all":
+                cached_stats = db_lb.query_stats(database, uuid, game, period)
+                if not cached_stats:
+                    embed.add_field(
+                        name="BlockParty Stats",
+                        value="This player does not have any cached stats available for this period.",
+                    )
+                    return embed
+
+                for key in BP_STATS_KEYS:
+                    stats[key] = stats[key] - cached_stats[key]
+
+            if stats["games_played"] == 0:
+                win_loss, win_rate = "Undefined", "Undefined"
+            else:
+                if stats["games_played"] == stats["victories"]:
+                    win_loss = "Infinity"
+                else:
+                    win_loss = "{:.2f}".format(
+                        stats["victories"]
+                        / (stats["games_played"] - stats["victories"])
+                    )
+
+                win_rate = "{:.2%}".format(stats["victories"] / stats["games_played"])
+
+            next_rank, diff = get_next_rank(stats["total_points"])
+            next_rank_text = (
+                f"({diff} points to {next_rank})" if period == "all" else ""
             )
 
-    await ctx.send(embed=embed)
+            if game == "BP":
+                if period != "all":
+                    embed_title = f"BlockParty {period.capitalize()} Stats"
+                else:
+                    embed_title = "BlockParty Stats"
+                embed.add_field(
+                    name=embed_title,
+                    value=(
+                        f"**Rank:** {stats['title']} {next_rank_text}\n"
+                        f"**Points:** {stats['total_points']}\n"
+                        f"**Games Played:** {stats['games_played']}\n"
+                        f"**Wins:** {stats['victories']}\n"
+                        f"**Placings:** {stats['total_placing']}\n"
+                        f"**Eliminations:** {stats['total_eliminations']}\n"
+                        f"\n"
+                        f"**W/L Ratio:** {win_loss}\n"
+                        f"**Win Rate:** {win_rate}"
+                    ),
+                )
+
+        return embed
+
+    msg = await ctx.send(embed=create_stats_embed(data, uuid, game, period))
+
+    if str(ctx.channel.type) != "text":
+        await ctx.send("Warning: The emojis are not auto removed in DMs.")
+
+    for reaction in reactions:
+        await msg.add_reaction(reaction)
+
+    async def stats_reaction_check():
+        try:
+            payload = await client.wait_for(
+                "raw_reaction_add", timeout=REACTION_POLLING_FREQ
+            )
+        except TimeoutError:
+            pass
+        else:
+            emoji = str(payload.emoji.name)
+
+            if (
+                payload.message_id == msg.id
+                and payload.user_id == ctx.author.id
+                and emoji in reactions
+            ):
+                stats_type = reactions[emoji]
+                await msg.edit(embed=create_stats_embed(data, uuid, game, stats_type))
+
+                if str(ctx.channel.type) == "text":
+                    await msg.remove_reaction(emoji, ctx.author)
+
+    while (datetime.utcnow() - msg.created_at).total_seconds() < REACTION_TIMEOUT:
+        await stats_reaction_check()
+
+    await msg.clear_reaction()
 
 
 @client.command(name="names", aliases=["history", "namemc"])
@@ -399,15 +469,26 @@ async def compare(ctx, uuid_a=None, uuid_b=None, game="BP"):
 
 
 @client.command(name="leaderboard", aliases=["leaderboards", "lb"])
-async def leaderboard(ctx, page=1, game="BP"):
+async def leaderboard(ctx, period="all", page=1, game="BP"):
     if page < 1 or page > 50:
         await ctx.send("Please input a page number between 1-50.")
         return
 
     page -= 1
+    reactions = {
+        "\u23EA": -10,  # rewind
+        "\u25C0": -1,  # left_arrow
+        "\u25B6": 1,  # right_arrow
+        "\u23E9": 10,  # fast_forward
+    }
 
-    def create_embed(page, game):
-        data = db_leaderboard.query_leaderboard(database, BATCH_SIZE * page, BATCH_SIZE)
+    def create_embed(page, game, period):
+        game = game.upper()
+        period = period.lower()
+
+        data = db_lb.query_leaderboard(
+            database, BATCH_SIZE * page, BATCH_SIZE, period=period
+        )
 
         embed = discord.Embed(title="**{} Leaderboard**".format(game), color=0xFFA500)
         embed.set_author(name=ctx.author, icon_url=ctx.author.avatar_url)
@@ -416,7 +497,7 @@ async def leaderboard(ctx, page=1, game="BP"):
             name="#    Player",
             value="\n".join(
                 [
-                    f"{entry['human_index']}) **{format_username(entry['username'])}**"
+                    f"{entry['row_num']}) **{format_username(entry['username'])}**"
                     for entry in data
                 ]
             ),
@@ -424,22 +505,23 @@ async def leaderboard(ctx, page=1, game="BP"):
 
         embed.add_field(
             name="Points",
-            value="\n".join([f"{entry['points']:,}" for entry in data]),
+            value="\n".join([f"{entry['total_points']:,}" for entry in data]),
         )
         return embed
 
-    msg = await ctx.send(embed=create_embed(page, game))
-    print(msg.channel.type)
+    msg = await ctx.send(embed=create_embed(page, game, period))
+
+    for reaction in reactions:
+        await msg.add_reaction(reaction)
+
     if str(msg.channel.type) != "text":
         await ctx.send('Warning: The emojis are not auto removed in DMs.')
-    await msg.add_reaction(REACTIONS["rewind"])
-    await msg.add_reaction(REACTIONS["left_arrow"])
-    await msg.add_reaction(REACTIONS["right_arrow"])
-    await msg.add_reaction(REACTIONS["fast_forward"])
 
     async def run_checks(page):
         try:
-            payload = await client.wait_for("raw_reaction_add", timeout=REACTION_POLLING_FREQ)
+            payload = await client.wait_for(
+                "raw_reaction_add", timeout=REACTION_POLLING_FREQ
+            )
         except TimeoutError:
             pass
         else:
@@ -448,38 +530,23 @@ async def leaderboard(ctx, page=1, game="BP"):
             if (
                 payload.message_id == msg.id
                 and payload.user_id == ctx.author.id
-                and emoji
-                in (
-                    REACTIONS["rewind"],
-                    REACTIONS["left_arrow"],
-                    REACTIONS["right_arrow"],
-                    REACTIONS["fast_forward"],
-                )
+                and emoji in reactions
             ):
-                
                 if str(msg.channel.type) == "text":
                     await msg.remove_reaction(emoji, ctx.author)
 
-                if emoji == REACTIONS["rewind"]:
-                    page -= 10
-                elif emoji == REACTIONS["left_arrow"]:
-                    page -= 1
-                elif emoji == REACTIONS["right_arrow"]:
-                    page += 1
-                elif emoji == REACTIONS["fast_forward"]:
-                    page += 10
-
+                page += reactions[emoji]
                 page %= int(LEADERBOARD_LENGTH / BATCH_SIZE)
-                await msg.edit(embed=create_embed(page, game))
+                await msg.edit(embed=create_embed(page, game, period))
 
-        if (datetime.utcnow() - msg.created_at).total_seconds() < REACTION_TIMEOUT:
-            await run_checks(page)
-        else:
-            await msg.clear_reactions()
+        return page
 
-    await run_checks(page)
+    while (datetime.utcnow() - msg.created_at).total_seconds() < REACTION_TIMEOUT:
+        page = await run_checks(page)
+
+    await msg.clear_reactions()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     Process(target=run_bot).start()
     Process(target=update_leaderboard).start()
