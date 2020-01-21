@@ -68,7 +68,7 @@ def player_head(uuid, size):
     Returns:
         str: url for the thumbnail image
     """
-    return "https://visage.surgeplay.com/head/{}/{}".format(size, uuid)
+    return "https://crafatar.com/avatars/{}?overlay&size={}".format(uuid,size)
 
 
 def resolve_username(username):
@@ -147,13 +147,13 @@ def format_interval(seconds, granularity=2):
     return result[:granularity]
 
 
-def embed_header(data, head_size=96):
+def embed_header(data, head_size=64):
     """Creates an embed with the primary fields filled in as required
 
     Args:
         data (dict): json data for player returned from hive api
         head_size (int, optional): width and heightin pixels of thumbnail image
-                                   defaults to 96
+                                   defaults to 64
 
     Returns:
         discord.Embed: an embed object formatted as required
@@ -201,7 +201,7 @@ async def seen(ctx, username):
         await ctx.send("This player has never played on The Hive.")
         return
 
-    embed = embed_header(data, 64)
+    embed = embed_header(data, 48)
     await ctx.send(embed=embed)
 
 
@@ -238,7 +238,6 @@ async def get_stats(ctx, uuid=None, period="all", game="BP"):
 
         embed = embed_header(data)
         cached_stats = db_lb.query_stats(database, uuid, game, period)
-
         if period != "all" and not cached_stats:
             embed.add_field(
                 name="BlockParty Stats",
@@ -269,7 +268,8 @@ async def get_stats(ctx, uuid=None, period="all", game="BP"):
             win_loss = "{:.2f}".format(stats["win_rate"] / (1 - stats["win_rate"]))
 
         next_rank, diff = get_next_rank(stats["total_points"])
-        next_rank_text = f"({diff} points to {next_rank})" if period == "all" else ""
+        next_rank_text = f"**Next Rank:** {next_rank} ({diff} points away)" if period == "all" else ""
+        leaderboard_text = f"**Leaderboard #**: {stats['position']}" if "position" in cached_stats else ""
 
         if game == "BP":
             if period != "all":
@@ -279,17 +279,23 @@ async def get_stats(ctx, uuid=None, period="all", game="BP"):
             embed.add_field(
                 name=embed_title,
                 value=(
-                    f"**Rank:** {stats['title']} {next_rank_text}\n"
+                    f"**Rank:** {stats['title']}\n"
                     f"**Points:** {stats['total_points']}\n"
                     f"**Games Played:** {stats['games_played']}\n"
                     f"**Wins:** {stats['victories']}\n"
                     f"**Placings:** {stats['total_placing']}\n"
                     f"**Eliminations:** {stats['total_eliminations']}\n"
-                    f"\n"
+                ),
+            )
+            embed.add_field(
+                name="\u200b",
+                value=(
+                    f"{next_rank_text}\n"
+                    f"{leaderboard_text}\n"
                     f"**W/L Ratio:** {win_loss}\n"
                     f"**Win Rate:** {stats['win_rate']:.2%}\n"
                     f"**Placing Rate:** {stats['placing_rate']:.2%}\n"
-                    f"**Points per Game**: {stats['points_per_game']:.2f}"
+                    f"**Points per Game**: {stats['points_per_game']:.2f}\n"
                 ),
             )
 
@@ -363,7 +369,7 @@ async def get_names(ctx, uuid=None, count: int = None):
         title="**{}'s Name History**".format(names[0]), color=0xFFA500
     )
 
-    embed.set_thumbnail(url=player_head(uuid, 96))
+    embed.set_thumbnail(url=player_head(uuid, 64))
 
     batch_size = 20
 
