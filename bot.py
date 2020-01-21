@@ -215,9 +215,14 @@ async def get_stats(ctx, uuid=None, period="all", game="BP"):
 
     uuid = resolved
     data = hive.player_data(uuid)
+    stats = hive.player_data(uuid, game)
 
     if not data:
         await ctx.send("This player has never played on The Hive.")
+        return
+
+    if not stats:
+        await ctx.send("This player has never played BlockParty.")
         return
 
     reactions = {
@@ -227,72 +232,70 @@ async def get_stats(ctx, uuid=None, period="all", game="BP"):
         "\U0001F1E6": "all",
     }
 
-    def create_stats_embed(data, uuid, game, period):
+    def create_stats_embed(data, stats, uuid, game, period):
         game = game.upper()
         period = period.lower()
 
         embed = embed_header(data)
-        stats = hive.player_data(uuid, game)
+        cached_stats = db_lb.query_stats(database, uuid, game, period)
 
-        if not stats:
+        if period != "all" and not cached_stats:
             embed.add_field(
                 name="BlockParty Stats",
-                value="This player has never played BlockParty.",
+                value="This player does not have any stats available for this period.",
             )
-        else:
-            if period != "all":
-                cached_stats = db_lb.query_stats(database, uuid, game, period)
-                if not cached_stats:
-                    embed.add_field(
-                        name="BlockParty Stats",
-                        value="This player does not have any cached stats available for this period.",
-                    )
-                    return embed
-
-                for key in BP_STATS_KEYS:
-                    stats[key] = stats[key] - cached_stats[key]
-
-            if stats["games_played"] == 0:
-                win_loss, win_rate = "Undefined", "Undefined"
+            return embed
+        elif not cached_stats:
+            if stats["games_played"]:
+                win_rate = stats["victories"] / stats["games_played"]
+                placing_rate = stats["total_placing"] / stats["games_played"]
+                points_per_game = stats["total_points"] / stats["games_played"]
             else:
-                if stats["games_played"] == stats["victories"]:
-                    win_loss = "Infinity"
-                else:
-                    win_loss = "{:.2f}".format(
-                        stats["victories"]
-                        / (stats["games_played"] - stats["victories"])
-                    )
+                win_rate, placing_rate, points_per_game = 0, 0, 0
 
-                win_rate = "{:.2%}".format(stats["victories"] / stats["games_played"])
+            cached_stats = {
+                "win_rate": win_rate,
+                "placing_rate": placing_rate,
+                "points_per_game": points_per_game,
+            }
 
-            next_rank, diff = get_next_rank(stats["total_points"])
-            next_rank_text = (
-                f"({diff} points to {next_rank})" if period == "all" else ""
+        stats.update(cached_stats)
+
+        if stats["games_played"] == 0:
+            win_loss = "Undefined"
+        elif stats["win_rate"] == 1:
+            win_loss = "Infinity"
+        else:
+            win_loss = "{:.2f}".format(stats["win_rate"] / (1 - stats["win_rate"]))
+
+        next_rank, diff = get_next_rank(stats["total_points"])
+        next_rank_text = f"({diff} points to {next_rank})" if period == "all" else ""
+
+        if game == "BP":
+            if period != "all":
+                embed_title = f"BlockParty {period.capitalize()} Stats"
+            else:
+                embed_title = "BlockParty Stats"
+            embed.add_field(
+                name=embed_title,
+                value=(
+                    f"**Rank:** {stats['title']} {next_rank_text}\n"
+                    f"**Points:** {stats['total_points']}\n"
+                    f"**Games Played:** {stats['games_played']}\n"
+                    f"**Wins:** {stats['victories']}\n"
+                    f"**Placings:** {stats['total_placing']}\n"
+                    f"**Eliminations:** {stats['total_eliminations']}\n"
+                    f"\n"
+                    f"**W/L Ratio:** {win_loss}\n"
+                    f"**Win Rate:** {stats['win_rate']:.2%}\n"
+                    f"**Placing Rate:** {stats['placing_rate']:.2%}\n"
+                    f"**Points per Game**: {stats['points_per_game']:.2f}"
+                ),
             )
-
-            if game == "BP":
-                if period != "all":
-                    embed_title = f"BlockParty {period.capitalize()} Stats"
-                else:
-                    embed_title = "BlockParty Stats"
-                embed.add_field(
-                    name=embed_title,
-                    value=(
-                        f"**Rank:** {stats['title']} {next_rank_text}\n"
-                        f"**Points:** {stats['total_points']}\n"
-                        f"**Games Played:** {stats['games_played']}\n"
-                        f"**Wins:** {stats['victories']}\n"
-                        f"**Placings:** {stats['total_placing']}\n"
-                        f"**Eliminations:** {stats['total_eliminations']}\n"
-                        f"\n"
-                        f"**W/L Ratio:** {win_loss}\n"
-                        f"**Win Rate:** {win_rate}"
-                    ),
-                )
 
         return embed
 
-    msg = await ctx.send(embed=create_stats_embed(data, uuid, game, period))
+    msg = await ctx.send(embed=create_stats_embed(data, stats, uuid, game, period))
 
     if str(ctx.channel.type) != "text":
         await ctx.send("Warning: The emojis are not auto removed in DMs.")
@@ -316,7 +319,9 @@ async def get_stats(ctx, uuid=None, period="all", game="BP"):
                 and emoji in reactions
             ):
                 stats_type = reactions[emoji]
-                await msg.edit(embed=create_stats_embed(data, uuid, game, stats_type))
+                await msg.edit(
+                    embed=create_stats_embed(data, stats, uuid, game, stats_type)
+                )
 
                 if str(ctx.channel.type) == "text":
                     await msg.remove_reaction(emoji, ctx.author)
@@ -324,7 +329,7 @@ async def get_stats(ctx, uuid=None, period="all", game="BP"):
     while (datetime.utcnow() - msg.created_at).total_seconds() < REACTION_TIMEOUT:
         await stats_reaction_check()
 
-    await msg.clear_reaction()
+    await msg.clear_reactions()
 
 
 @client.command(name="names", aliases=["history", "namemc"])
@@ -515,7 +520,7 @@ async def leaderboard(ctx, period="all", page=1, game="BP"):
         await msg.add_reaction(reaction)
 
     if str(msg.channel.type) != "text":
-        await ctx.send('Warning: The emojis are not auto removed in DMs.')
+        await ctx.send("Warning: The emojis are not auto removed in DMs.")
 
     async def run_checks(page):
         try:
