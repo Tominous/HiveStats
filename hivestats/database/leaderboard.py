@@ -173,51 +173,25 @@ def query_leaderboard(
     Returns:
         Tuple(dict): tuple of leaderboard entries
     """
-    if period == "all":
-        database.cursor.execute(
-            """
-                select * from (
-                    select row_number() over (order by %(sort_by)s %(sort_order)s) as row_num,
-                        *
-                    from %(game)s_all
-                ) sorted
-                    where row_num > %(start)s
-                    limit %(limit)s;
-            """,
-            {
-                "game": AsIs(game),
-                "start": AsIs(start),
-                "limit": AsIs(length),
-                "sort_by": AsIs(sort_by),
-                "sort_order": AsIs(sort_order),
-            },
-        )
-    else:
-        database.cursor.execute(
-            """
-                select * from (
-                    select row_number() over (order by %(sort_by)s %(sort_order)s) as row_num, *
-                    from(
-                        select
-                            current.uuid,
-                            current.username,
-                            (current.total_points - cached.total_points) as total_points
-                        from %(game)s_all current, %(game)s_%(period)s cached
-                            where current.uuid = cached.uuid
-                        ) windowed
-                    ) sorted
-                    where row_num > %(start)s
-                    limit %(limit)s;
-            """,
-            {
-                "game": AsIs(game),
-                "period": AsIs(period),
-                "start": AsIs(start),
-                "limit": AsIs(length),
-                "sort_by": AsIs(sort_by),
-                "sort_order": AsIs(sort_order),
-            },
-        )
+    database.cursor.execute(
+        """
+            select * from (
+                select row_number() over (order by %(sort_by)s %(sort_order)s) as row_num,
+                    *
+                from %(game)s_%(period)s_view
+            ) sorted
+                where row_num > %(start)s
+                limit %(limit)s;
+        """,
+        {
+            "game": AsIs(game),
+            "period": AsIs(period),
+            "start": AsIs(start),
+            "limit": AsIs(length),
+            "sort_by": AsIs(sort_by),
+            "sort_order": AsIs(sort_order),
+        },
+    )
 
     return database.cursor.fetchall()
 
@@ -234,7 +208,7 @@ def query_stats(database: Postgres, uuid, game="bp", period="all"):
     """
     database.cursor.execute(
         """
-            select * from %(game)s_%(period)s
+            select * from %(game)s_%(period)s_view
                 where uuid = %(uuid)s;
         """,
         {"game": AsIs(game), "period": AsIs(period), "uuid": uuid},
