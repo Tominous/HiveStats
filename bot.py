@@ -298,6 +298,7 @@ async def get_stats(ctx, uuid=None, period="all", game="BP"):
                     f"**Points per Game**: {stats['points_per_game']:.2f}\n"
                 ),
             )
+            embed.set_footer(text="D: Daily, W: Weekly, M: Monthly, A: All-time")
 
         return embed
 
