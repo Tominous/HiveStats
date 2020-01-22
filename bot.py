@@ -489,11 +489,41 @@ async def compare(ctx, uuid_a=None, uuid_b=None, game="BP"):
 
 
 @client.command(name="leaderboard", aliases=["leaderboards", "lb"])
-async def leaderboard(ctx, period="all", page=1, game="BP"):
-    if page < 1 or page > 50:
+async def leaderboard(ctx, period="all", column="points", page=1, game="BP"):
+    columns_dict = {
+        "wins": "victories",
+        "points": "total_points",
+        "elims": "total_eliminations",
+        "placings": "total_placing",
+        "played": "games_played",
+        "win%": "win_rate",
+        "placing%": "placing_rate",
+        "ppg": "points_per_game",
+    }
+    valid_periods = ["all", "monthly", "weekly", "daily"]
+    usage = "**Invalid Parameters: ** Expected /lb [period] [column] [page]\n"
+
+    if period not in valid_periods:
+        await ctx.send(
+            "{}Please use one of the following periods: ```{}```".format(
+                usage, ", ".join(valid_periods)
+            )
+        )
+        return
+
+    if column not in columns_dict:
+        await ctx.send(
+            "{}Please use one of the following columns: ```{}```".format(
+                usage, ", ".join(columns_dict.keys())
+            )
+        )
+        return
+
+    if not isinstance(page, int) or page < 1 or page > 50:
         await ctx.send("Please input a page number between 1-50.")
         return
 
+    column = columns_dict[column]
     page -= 1
     reactions = {
         "\u23EA": -10,  # rewind
@@ -507,8 +537,23 @@ async def leaderboard(ctx, period="all", page=1, game="BP"):
         period = period.lower()
 
         data = db_lb.query_leaderboard(
-            database, BATCH_SIZE * page, BATCH_SIZE, period=period
+            database, BATCH_SIZE * page, BATCH_SIZE, sort_by=column, period=period
         )
+
+        if column in [
+            "victories",
+            "total_points",
+            "total_eliminations",
+            "total_placing",
+            "games_played",
+        ]:
+            format_string = ","
+        elif column in ["win_rate", "placing_rate"]:
+            format_string = ".2%"
+        elif column in ["points_per_game"]:
+            format_string = ".2f"
+        else:
+            format_string = ""
 
         embed = discord.Embed(title="**{} Leaderboard**".format(game), color=0xFFA500)
         embed.set_author(name=ctx.author, icon_url=ctx.author.avatar_url)
@@ -524,12 +569,18 @@ async def leaderboard(ctx, period="all", page=1, game="BP"):
         )
 
         embed.add_field(
-            name="Points",
-            value="\n".join([f"{entry['total_points']:,}" for entry in data]),
+            name=column.replace("_", " ").capitalize(),
+            value="\n".join([f"{entry[column]:{format_string}}" for entry in data]),
         )
-        return embed
+        return embed, True
 
-    msg = await ctx.send(embed=create_embed(page, game, period))
+    result, success = create_embed(page, game, period)
+
+    if not success:
+        await ctx.send(result)
+        return
+
+    msg = await ctx.send(embed=result)
 
     for reaction in reactions:
         await msg.add_reaction(reaction)
@@ -557,7 +608,9 @@ async def leaderboard(ctx, period="all", page=1, game="BP"):
 
                 page += reactions[emoji]
                 page %= int(LEADERBOARD_LENGTH / BATCH_SIZE)
-                await msg.edit(embed=create_embed(page, game, period))
+
+                result, _ = create_embed(page, game, period)
+                await msg.edit(embed=result)
 
         return page
 
