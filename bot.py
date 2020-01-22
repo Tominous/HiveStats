@@ -262,12 +262,12 @@ async def get_stats(ctx, uuid=None, period="all", game="BP"):
 
         next_rank, diff = get_next_rank(stats["total_points"])
         next_rank_text = (
-            f"**Next Rank:** {next_rank} ({diff} points away)"
+            f"**Next Rank:** {next_rank} ({diff:,} points away)\n"
             if period == "all"
             else ""
         )
         leaderboard_text = (
-            f"**Leaderboard #**: {stats['position']}"
+            f"**Leaderboard #**: {stats['position']}\n"
             if "position" in cached_stats
             else ""
         )
@@ -280,18 +280,18 @@ async def get_stats(ctx, uuid=None, period="all", game="BP"):
             name=embed_title,
             value=(
                 f"**Rank:** {stats['title']}\n"
-                f"**Points:** {stats['total_points']}\n"
-                f"**Games Played:** {stats['games_played']}\n"
-                f"**Wins:** {stats['victories']}\n"
-                f"**Placings:** {stats['total_placing']}\n"
-                f"**Eliminations:** {stats['total_eliminations']}\n"
+                f"**Points:** {stats['total_points']:,}\n"
+                f"**Games Played:** {stats['games_played']:,}\n"
+                f"**Wins:** {stats['victories']:,}\n"
+                f"**Placings:** {stats['total_placing']:,}\n"
+                f"**Eliminations:** {stats['total_eliminations']:,}\n"
             ),
         )
         embed.add_field(
             name="\u200b",
             value=(
-                f"{next_rank_text}\n"
-                f"{leaderboard_text}\n"
+                f"{next_rank_text}"
+                f"{leaderboard_text}"
                 f"**W/L Ratio:** {win_loss}\n"
                 f"**Win Rate:** {stats['win_rate']:.2%}\n"
                 f"**Placing Rate:** {stats['placing_rate']:.2%}\n"
