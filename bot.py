@@ -24,13 +24,6 @@ LEADERBOARD_LENGTH = 1000  # Number of players on the Hive leaderboard
 REACTION_TIMEOUT = 600  # Timeout for reaction based interfaces
 REACTION_POLLING_FREQ = 60  # Frequency at which reaction checks auto-timeout
 
-BP_STATS_KEYS = [
-    "victories",
-    "total_points",
-    "total_eliminations",
-    "total_placing",
-    "games_played",
-]
 
 client = Bot(command_prefix=BOT_PREFIX, case_insensitive=True)
 database = Postgres()
@@ -279,34 +272,33 @@ async def get_stats(ctx, uuid=None, period="all", game="BP"):
             else ""
         )
 
-        if game == "BP":
-            if period != "all":
-                embed_title = f"BlockParty {period.capitalize()} Stats"
-            else:
-                embed_title = "BlockParty Stats"
-            embed.add_field(
-                name=embed_title,
-                value=(
-                    f"**Rank:** {stats['title']}\n"
-                    f"**Points:** {stats['total_points']}\n"
-                    f"**Games Played:** {stats['games_played']}\n"
-                    f"**Wins:** {stats['victories']}\n"
-                    f"**Placings:** {stats['total_placing']}\n"
-                    f"**Eliminations:** {stats['total_eliminations']}\n"
-                ),
-            )
-            embed.add_field(
-                name="\u200b",
-                value=(
-                    f"{next_rank_text}\n"
-                    f"{leaderboard_text}\n"
-                    f"**W/L Ratio:** {win_loss}\n"
-                    f"**Win Rate:** {stats['win_rate']:.2%}\n"
-                    f"**Placing Rate:** {stats['placing_rate']:.2%}\n"
-                    f"**Points per Game**: {stats['points_per_game']:.2f}\n"
-                ),
-            )
-            embed.set_footer(text="D: Daily, W: Weekly, M: Monthly, A: All-time")
+        if period != "all":
+            embed_title = f"BlockParty {period.capitalize()} Stats"
+        else:
+            embed_title = "BlockParty Stats"
+        embed.add_field(
+            name=embed_title,
+            value=(
+                f"**Rank:** {stats['title']}\n"
+                f"**Points:** {stats['total_points']}\n"
+                f"**Games Played:** {stats['games_played']}\n"
+                f"**Wins:** {stats['victories']}\n"
+                f"**Placings:** {stats['total_placing']}\n"
+                f"**Eliminations:** {stats['total_eliminations']}\n"
+            ),
+        )
+        embed.add_field(
+            name="\u200b",
+            value=(
+                f"{next_rank_text}\n"
+                f"{leaderboard_text}\n"
+                f"**W/L Ratio:** {win_loss}\n"
+                f"**Win Rate:** {stats['win_rate']:.2%}\n"
+                f"**Placing Rate:** {stats['placing_rate']:.2%}\n"
+                f"**Points per Game**: {stats['points_per_game']:.2f}\n"
+            ),
+        )
+        embed.set_footer(text="D: Daily, W: Weekly, M: Monthly, A: All-time")
 
         return embed
 
