@@ -524,7 +524,7 @@ async def leaderboard(ctx, period="all", column="points", page=1, game="BP"):
         "\u23E9": 10,  # fast_forward
     }
 
-    def create_embed(page, game, period):
+    def create_lb_embed(page, game, period):
         game = game.upper()
         period = period.lower()
 
@@ -547,7 +547,12 @@ async def leaderboard(ctx, period="all", column="points", page=1, game="BP"):
         else:
             format_string = ""
 
-        embed = discord.Embed(title="**{} Leaderboard**".format(game), color=0xFFA500)
+        if period != "all":
+            embed_title = f"BlockParty {period.capitalize()} Leaderboard"
+        else:
+            embed_title = "BlockParty Leaderboard"
+
+        embed = discord.Embed(title=embed_title, color=0xFFA500)
         embed.set_author(name=ctx.author, icon_url=ctx.author.avatar_url)
         embed.set_footer(text=f"Current page: {page + 1}")
         embed.add_field(
@@ -566,7 +571,7 @@ async def leaderboard(ctx, period="all", column="points", page=1, game="BP"):
         )
         return embed, True
 
-    result, success = create_embed(page, game, period)
+    result, success = create_lb_embed(page, game, period)
 
     if not success:
         await ctx.send(result)
@@ -601,7 +606,7 @@ async def leaderboard(ctx, period="all", column="points", page=1, game="BP"):
                 page += reactions[emoji]
                 page %= int(LEADERBOARD_LENGTH / BATCH_SIZE)
 
-                result, _ = create_embed(page, game, period)
+                result, _ = create_lb_embed(page, game, period)
                 await msg.edit(embed=result)
 
         return page
