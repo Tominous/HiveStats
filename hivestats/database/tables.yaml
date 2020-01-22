@@ -11,17 +11,17 @@ last_updated:
     name: unique
 
 # All BlockParty tables
-bp_main:
-  name: bp_main
+bp_all:
+  name: bp_all
   columns:
     - index
     - human_index
     - uuid
-    - wins
-    - points
-    - elims
-    - placings
-    - played
+    - victories
+    - total_points
+    - total_eliminations
+    - total_placing
+    - games_played
     - username
   types:
     - int
@@ -43,11 +43,11 @@ bp_daily:
     - index
     - human_index
     - uuid
-    - wins
-    - points
-    - elims
-    - placings
-    - played
+    - victories
+    - total_points
+    - total_eliminations
+    - total_placing
+    - games_played
     - username
   types:
     - int
@@ -69,11 +69,11 @@ bp_weekly:
     - index
     - human_index
     - uuid
-    - wins
-    - points
-    - elims
-    - placings
-    - played
+    - victories
+    - total_points
+    - total_eliminations
+    - total_placing
+    - games_played
     - username
   types:
     - int
@@ -95,11 +95,11 @@ bp_monthly:
     - index
     - human_index
     - uuid
-    - wins
-    - points
-    - elims
-    - placings
-    - played
+    - victories
+    - total_points
+    - total_eliminations
+    - total_placing
+    - games_played
     - username
   types:
     - int
