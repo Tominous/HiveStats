@@ -68,7 +68,7 @@ def player_head(uuid, size):
     Returns:
         str: url for the thumbnail image
     """
-    return "https://crafatar.com/avatars/{}?overlay&size={}".format(uuid,size)
+    return "https://visage.surgeplay.com/face/{}/{}".format(size, uuid)
 
 
 def resolve_username(username):
@@ -268,8 +268,16 @@ async def get_stats(ctx, uuid=None, period="all", game="BP"):
             win_loss = "{:.2f}".format(stats["win_rate"] / (1 - stats["win_rate"]))
 
         next_rank, diff = get_next_rank(stats["total_points"])
-        next_rank_text = f"**Next Rank:** {next_rank} ({diff} points away)" if period == "all" else ""
-        leaderboard_text = f"**Leaderboard #**: {stats['position']}" if "position" in cached_stats else ""
+        next_rank_text = (
+            f"**Next Rank:** {next_rank} ({diff} points away)"
+            if period == "all"
+            else ""
+        )
+        leaderboard_text = (
+            f"**Leaderboard #**: {stats['position']}"
+            if "position" in cached_stats
+            else ""
+        )
 
         if game == "BP":
             if period != "all":
